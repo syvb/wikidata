@@ -1,0 +1,11 @@
+[package]
+name = "wikidata"
+version = "0.1.0"
+authors = ["Smitty <me@smitop.com>"]
+edition = "2018"
+
+[dependencies]
+chrono = { version = "0.4.19", features = ["std", "serde", "clock"], default-features = false }
+serde = { version = "1.0.126", features = ["derive"] }
+json = "0.12.4"
+lazy_static = "1.4.0"
