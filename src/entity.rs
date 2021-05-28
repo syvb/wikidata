@@ -49,7 +49,7 @@ pub enum ClaimValueData {
     /// A Wikidata property.
     Property(Pid),
     /// A language-less string of text.
-    Stringg(String),
+    String(String),
     /// Text with a language.
     MonolingualText(Text),
     /// The same text, translated across multiple languages.
@@ -333,7 +333,7 @@ impl ClaimValueData {
             "string" => {
                 let s = value.take_string().ok_or(EntityError::ExpectedString)?;
                 match datatype {
-                    "string" => Ok(ClaimValueData::Stringg(s)),
+                    "string" => Ok(ClaimValueData::String(s)),
                     "commonsMedia" => Ok(ClaimValueData::CommonsMedia(s)),
                     "external-id" => Ok(ClaimValueData::ExternalID(s)),
                     "math" => Ok(ClaimValueData::MathExpr(s)),
