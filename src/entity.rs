@@ -284,10 +284,7 @@ impl ClaimValueData {
                     "musical-notation" => Ok(ClaimValueData::MusicNotation(s)),
                     "tabular-data" => Ok(ClaimValueData::TabularData(s)),
                     "url" => Ok(ClaimValueData::Url(s)),
-                    _ => {
-                        eprintln!("Invalid datatype {}", datatype);
-                        Err(EntityError::InvalidDatatype)
-                    }
+                    _ => Err(EntityError::InvalidDatatype),
                 }
             }
             "wikibase-entityid" => {
@@ -358,10 +355,7 @@ impl ClaimValueData {
                 text: get_json_string(take_prop("text", &mut value))?,
                 lang: get_json_string(take_prop("language", &mut value))?,
             }),
-            other => {
-                eprintln!("Couldn't parse data type {}", other);
-                Err(EntityError::UnknownDatatype)
-            }
+            _ => Err(EntityError::UnknownDatatype),
         }
     }
 }
@@ -402,9 +396,7 @@ impl ClaimValue {
                         match ClaimValueData::parse_snak(owned_snak) {
                             Ok(x) => claims
                                 .push((Pid(pid[1..].parse().expect("Invalid property ID")), x)),
-                            Err(_) => {
-                                eprintln!("Failed to parse reference snak");
-                            }
+                            Err(_) => {}
                         }
                     }
                 }
@@ -429,9 +421,7 @@ impl ClaimValue {
                 for claim in claim_array.drain(..) {
                     match ClaimValueData::parse_snak(claim) {
                         Ok(x) => v.push((Pid(pid[1..].parse().expect("Invalid property ID")), x)),
-                        Err(_) => {
-                            eprintln!("Failed to parse qualifier snak");
-                        }
+                        Err(_) => {}
                     };
                 }
             }
