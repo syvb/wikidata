@@ -14,7 +14,7 @@ macro_rules! id_def {
         #[derive(
             Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
-        pub struct $name(pub u32);
+        pub struct $name(pub u64);
 
         impl $name {
             /// Get the URL to access data about the claim on Wikidata.
