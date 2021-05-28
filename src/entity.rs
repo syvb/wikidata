@@ -135,19 +135,6 @@ impl Entity {
         }
         None
     }
-
-    /// The amount of days that the entity was in operations. For animals, this is lifespan.
-    /// For corporations and other legal entities it's the time between formation and dissolution.
-    pub fn timespan(&self) -> Option<u64> {
-        let start = self.start_time()?;
-        let end = self.end_time().unwrap_or_else(Utc::now);
-        let days = end.signed_duration_since(start).num_days();
-        if days < 0 {
-            None
-        } else {
-            Some(days as u64)
-        }
-    }
 }
 
 fn get_json_string(mut json: json::JsonValue) -> String {
