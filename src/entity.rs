@@ -208,6 +208,8 @@ pub enum EntityError {
     MissingMinute,
     MissingSecond,
     InvalidSnaktype,
+    InvalidPrecision,
+    NoRank,
 }
 
 fn get_json_string(mut json: json::JsonValue) -> Result<String, EntityError> {
@@ -322,13 +324,13 @@ impl ClaimValueData {
         };
         let type_str = take_prop("type", &mut datavalue)
             .take_string()
-            .expect("Invalid datavalue type. Perhaps a new data type has been added?");
+            .ok_or(EntityError::InvalidSnaktype)?;
         let mut value = take_prop("value", &mut datavalue);
         match &type_str[..] {
             "string" => {
                 let s = value
                     .take_string()
-                    .expect("expected string, didn't find one");
+                    .ok_or(EntityError::ExpectedString)?;
                 match datatype {
                     "string" => Ok(ClaimValueData::Stringg(s)),
                     "commonsMedia" => Ok(ClaimValueData::CommonsMedia(s)),
@@ -344,33 +346,33 @@ impl ClaimValueData {
             "wikibase-entityid" => {
                 // the ID could be a entity, lexeme, property, form, or sense
                 let id = get_json_string(take_prop("id", &mut value))?;
-                match id.chars().next().expect("Entity ID was empty string") {
+                match id.chars().next().ok_or(EntityError::BadId)? {
                     'Q' => Ok(ClaimValueData::Item(Qid(id[1..]
                         .parse()
-                        .expect("Malformed entity ID")))),
+                        .map_err(|_| EntityError::BadId)?))),
                     'P' => Ok(ClaimValueData::Property(Pid(id[1..]
                         .parse()
-                        .expect("Malformed property ID")))),
+                        .map_err(|_| EntityError::BadId)?))),
                     'L' => {
                         // sense: "L1-S2", form: "L1-F2", lexeme: "L2"
                         let parts: Vec<&str> = id.split('-').collect();
                         match parts.len() {
                             1 => Ok(ClaimValueData::Lexeme(Lid(id[1..]
                                 .parse()
-                                .expect("Malformed lexeme ID")))),
+                                .map_err(|_| EntityError::BadId)?))),
                             2 => {
                                 match parts[1]
                                     .chars()
                                     .next()
-                                    .expect("Nothing after dash in lexeme ID")
+                                    .ok_or(EntityError::BadId)?
                                 {
                                     'F' => Ok(ClaimValueData::Form(Fid(
-                                        Lid(parts[0][1..].parse().expect("Malformed lexeme ID")),
-                                        parts[1][1..].parse().expect("Invalid form ID"),
+                                        Lid(parts[0][1..].parse().map_err(|_| EntityError::BadId)?),
+                                        parts[1][1..].parse().map_err(|_| EntityError::BadId)?,
                                     ))),
                                     'S' => Ok(ClaimValueData::Sense(Sid(
-                                        Lid(parts[0][1..].parse().expect("Malformed lexeme ID")),
-                                        parts[1][1..].parse().expect("Invalid sense ID"),
+                                        Lid(parts[0][1..].parse().map_err(|_| EntityError::BadId)?),
+                                        parts[1][1..].parse().map_err(|_| EntityError::BadId)?,
                                     ))),
                                     _ => Err(EntityError::BadId),
                                 }
@@ -403,7 +405,7 @@ impl ClaimValueData {
                 // just give up on parsing the snak if parse_wb_time returns None
                 date_time: parse_wb_time(&get_json_string(take_prop("time", &mut value))?)?,
                 precision: parse_wb_number(&take_prop("precision", &mut value))
-                    .expect("Invalid precision {}") as u8,
+                    .map_err(|_| EntityError::InvalidPrecision)? as u8,
             }),
             "monolingualtext" => Ok(ClaimValueData::MonolingualText(Text {
                 text: get_json_string(take_prop("text", &mut value))?,
@@ -419,8 +421,7 @@ impl ClaimValue {
     #[must_use]
     pub fn get_prop_from_snak(mut claim: json::JsonValue, skip_id: bool) -> Option<ClaimValue> {
         let claim_str = take_prop("rank", &mut claim)
-            .take_string()
-            .expect("No rank");
+            .take_string()?;
         let rank = match &claim_str[..] {
             "deprecated" => {
                 return None;
@@ -450,7 +451,7 @@ impl ClaimValue {
                         let owned_snak = snak.clone().take();
                         match ClaimValueData::parse_snak(owned_snak) {
                             Ok(x) => claims
-                                .push((Pid(pid[1..].parse().expect("Invalid property ID")), x)),
+                                .push((Pid(pid[1..].parse().ok()?), x)),
                             Err(_) => {}
                         }
                     }
@@ -475,7 +476,7 @@ impl ClaimValue {
                     };
                 for claim in claim_array.drain(..) {
                     match ClaimValueData::parse_snak(claim) {
-                        Ok(x) => v.push((Pid(pid[1..].parse().expect("Invalid property ID")), x)),
+                        Ok(x) => v.push((Pid(pid[1..].parse().ok()?), x)),
                         Err(_) => {}
                     };
                 }
