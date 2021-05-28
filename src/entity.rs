@@ -6,6 +6,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
     pub claims: Vec<(Pid, ClaimValue)>,
+    pub entity_type: EntityType,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EntityType {
+    Entity,
+    Property,
+    Lexeme,
 }
 
 /// Data relating to a claim value.
