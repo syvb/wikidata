@@ -72,21 +72,24 @@ pub enum ClaimValueData {
         /// The time as a Chrono DateTime.
         date_time: DateTime<chrono::offset::Utc>,
         /// The precision of the date:
-        /// 0 - billion years
-        /// 1 - 100 million years
-        /// 2 - 10 million years
-        /// 3 - 1 million years
-        /// 4 - 100k years
-        /// 5 - 10k years
-        /// 6 - 1000 years
-        /// 7 - 100 years
-        /// 8 - decade
-        /// 9 - year
-        /// 10 - month
-        /// 11 - day
-        /// 12 - hour (deprecated)
-        /// 13 - minute (deprecated)
-        /// 14 - second (deprecated)
+        ///
+        /// | precision | time |
+        /// | --------- | ---- |
+        /// | `0` | 1 billion years |
+        /// | `1` | 100 million years |
+        /// | `2` | 10 million years |
+        /// | `3` | 1 million years |
+        /// | `4` | 100k years |
+        /// | `5` | 10k years |
+        /// | `6` | 1000 years |
+        /// | `7` | 100 years |
+        /// | `8` | decade |
+        /// | `9` | year |
+        /// | `10` | month |
+        /// | `11` | day |
+        /// | `12` | hour (deprecated) |
+        /// | `13` | minute (deprecated) |
+        /// | `14` | second (deprecated) |
         precision: u8,
     },
     /// A URL.
