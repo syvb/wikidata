@@ -1,12 +1,14 @@
 use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid};
+use crate::text::{Text, Lang};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
-/// A Wikibase entity.
+/// A Wikibase entity: this could be an entity, property, or lexeme.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
     pub claims: Vec<(Pid, ClaimValue)>,
     pub entity_type: EntityType,
+    pub description: Text,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -30,10 +32,8 @@ pub enum ClaimValueData {
     Item(Qid),
     Property(Pid),
     Stringg(String),
-    MonolingualText {
-        text: String,
-        lang: String,
-    },
+    MonolingualText(Text),
+    MultilingualText(Vec<Text>),
     ExternalID(String),
     Quantity {
         amount: f64, // technically it could exceed the bound, but meh
@@ -359,10 +359,10 @@ impl ClaimValueData {
                 precision: parse_wb_number(&take_prop("precision", &mut value))
                     .expect("Invalid precision {}") as u8,
             }),
-            "monolingualtext" => Ok(ClaimValueData::MonolingualText {
+            "monolingualtext" => Ok(ClaimValueData::MonolingualText(Text {
                 text: get_json_string(take_prop("text", &mut value))?,
-                lang: get_json_string(take_prop("language", &mut value))?,
-            }),
+                lang: Lang(get_json_string(take_prop("language", &mut value))?),
+            })),
             _ => Err(EntityError::UnknownDatatype),
         }
     }
