@@ -443,9 +443,8 @@ impl ClaimValue {
                     for snak in members.drain(..) {
                         // clone, meh
                         let owned_snak = snak.clone().take();
-                        match ClaimValueData::parse_snak(owned_snak) {
-                            Ok(x) => claims.push((Pid(pid[1..].parse().ok()?), x)),
-                            Err(_) => {}
+                        if let Ok(x) = ClaimValueData::parse_snak(owned_snak) {
+                            claims.push((Pid(pid[1..].parse().ok()?), x))
                         }
                     }
                 }
@@ -468,10 +467,9 @@ impl ClaimValue {
                         return None;
                     };
                 for claim in claim_array.drain(..) {
-                    match ClaimValueData::parse_snak(claim) {
-                        Ok(x) => v.push((Pid(pid[1..].parse().ok()?), x)),
-                        Err(_) => {}
-                    };
+                    if let Ok(x) = ClaimValueData::parse_snak(claim) {
+                        v.push((Pid(pid[1..].parse().ok()?), x))
+                    }
                 }
             }
             v
