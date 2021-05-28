@@ -377,21 +377,16 @@ pub mod test {
 
     #[test]
     fn json_url() {
-        let entity = Qid(42);
         assert_eq!(
-            entity.json_url(),
+            Qid(42).json_url(),
             "https://www.wikidata.org/wiki/Special:EntityData/Q42.json"
         );
-
-        let prop = Pid(31);
         assert_eq!(
             prop.json_url(),
             "https://www.wikidata.org/wiki/Special:EntityData/P31.json"
         );
-
-        let lexeme = Lid(1);
         assert_eq!(
-            lexeme.json_url(),
+            Lid(1).json_url(),
             "https://www.wikidata.org/wiki/Special:EntityData/L1.json"
         )
     }
