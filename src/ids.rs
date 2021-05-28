@@ -98,6 +98,7 @@ impl ToString for Sid {
 macro_rules! qid_consts (
     { $($key:ident => $value:expr),+, } => {
         $(
+            #[allow(missing_docs)]
             pub const $key: Qid = Qid($value);
         )+
     };
@@ -105,6 +106,7 @@ macro_rules! qid_consts (
 macro_rules! pid_consts (
     { $($key:ident => $value:expr),+, } => {
         $(
+            #[allow(missing_docs)]
             pub const $key: Pid = Pid($value);
         )+
     };
@@ -128,6 +130,7 @@ macro_rules! qid_unit_suffixes {
 
 impl Qid {
     /// If the Qid is a commonly used unit on Wikidata, get it as a unit suffix.
+    #[must_use]
     pub fn unit_suffix(self) -> Option<&'static str> {
         consts::unit_suffix(self)
     }

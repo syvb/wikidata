@@ -123,8 +123,11 @@ impl Default for ClaimValueData {
 /// A statement rank.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Rank {
+    /// The deprecated rank, indicating outdated/wrong info.
     Deprecated,
+    /// Normal rank, the default.
     Normal,
+    /// Preferred rank, indicates the claim is most recent or accurate.
     Preferred,
 }
 
@@ -146,15 +149,19 @@ pub struct ReferenceGroup {
 pub struct ClaimValue {
     /// The data of the claim.
     pub data: ClaimValueData,
+    /// The rank of this claim.
     pub rank: Rank,
     /// The globally unique claim ID.
     pub id: String,
+    /// All of the qualifiers for this claim.
     pub qualifiers: Vec<(Pid, ClaimValueData)>,
+    /// All of the groups of references for this claim.
     pub references: Vec<ReferenceGroup>,
 }
 
 impl Entity {
     /// All of the values of "instance of" on the entity.
+    #[must_use]
     pub fn instances(&self) -> Vec<Qid> {
         let mut instances = Vec::with_capacity(1);
         for (pid, claim) in &self.claims {
@@ -169,6 +176,7 @@ impl Entity {
     }
 
     /// When the entity started existing.
+    #[must_use]
     pub fn start_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
             if *pid == consts::DATE_OF_BIRTH {
@@ -181,6 +189,7 @@ impl Entity {
     }
 
     /// When the entity stopped existing.
+    #[must_use]
     pub fn end_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
             if *pid == consts::DATE_OF_DEATH {
@@ -197,21 +206,37 @@ impl Entity {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum EntityError {
+    /// A float couldn't be parsed.
     FloatParse,
+    /// A string was expected but not found
     ExpectedString,
+    /// A valid Qid URI was expected but not found
     ExpectedQidString,
+    /// A time string was empty
     TimeEmpty,
+    /// An ID was invalid
     BadId,
+    /// A date didn't have a year
     NoDateYear,
+    /// No date matched the day/month/year
     NoDateMatched,
+    /// An ambiguous date was specified
     DateAmbiguous,
+    /// The datatype was invalid
     InvalidDatatype,
+    /// The datatype was invalid or unknown
     UnknownDatatype,
+    /// The time was missing an hour
     MissingHour,
+    /// The time was missing an minute
     MissingMinute,
+    /// The time was missing an second
     MissingSecond,
+    /// The snaktype was invalid
     InvalidSnaktype,
+    /// The precision level was invalid
     InvalidPrecision,
+    /// No rank was specified
     NoRank,
 }
 
@@ -315,6 +340,9 @@ fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, En
 
 impl ClaimValueData {
     /// Parses a snak.
+    ///
+    /// # Errors
+    /// If the `snak` does not correspond to a valid snak, then an error will be returned.
     pub fn parse_snak(mut snak: json::JsonValue) -> Result<Self, EntityError> {
         let mut datavalue: json::JsonValue = take_prop("datavalue", &mut snak);
         let datatype: &str = &get_json_string(take_prop("datatype", &mut snak))?;
