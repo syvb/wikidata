@@ -137,35 +137,53 @@ impl Entity {
     }
 }
 
-fn get_json_string(mut json: json::JsonValue) -> String {
-    match json.take_string() {
-        Some(x) => x,
-        None => panic!("get_json_stringing called with a non-string JsonValue"),
-    }
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EntityError {
+    FloatParse,
+    ExpectedString,
+    ExpectedQidString,
+    TimeEmpty,
+    BadId,
+    NoDateYear,
+    NoDateMatched,
+    DateAmbiguous,
+    InvalidDatatype,
+    UnknownDatatype,
+    MissingHour,
+    MissingMinute,
+    MissingSecond,
+    InvalidSnaktype,
 }
 
-fn parse_wb_number(num: &json::JsonValue) -> Option<f64> {
+fn get_json_string(mut json: json::JsonValue) -> Result<String, EntityError> {
+    json.take_string().ok_or(EntityError::ExpectedString)
+}
+
+fn parse_wb_number(num: &json::JsonValue) -> Result<f64, EntityError> {
     // could be a string repersenting a number, or a number
     if num.is_number() {
-        Some(num.as_number()?.into())
+        Ok(num.as_number().ok_or(EntityError::FloatParse)?.into())
     } else {
-        let s = num.as_str()?;
+        let s = num.as_str().ok_or(EntityError::ExpectedString)?;
         match s.parse() {
-            Ok(x) => Some(x),
-            Err(_) => None,
+            Ok(x) => Ok(x),
+            Err(_) => Err(EntityError::FloatParse),
         }
     }
 }
 
-fn try_get_as_qid(datavalue: &json::JsonValue) -> Option<Qid> {
+fn try_get_as_qid(datavalue: &json::JsonValue) -> Result<Qid, EntityError> {
     match datavalue
-        .as_str()?
+        .as_str()
+        .ok_or(EntityError::ExpectedString)?
         .split("http://www.wikidata.org/entity/Q")
-        .nth(1)?
+        .nth(1)
+        .ok_or(EntityError::ExpectedQidString)?
         .parse()
     {
-        Ok(x) => Some(Qid(x)),
-        Err(_) => None,
+        Ok(x) => Ok(Qid(x)),
+        Err(_) => Err(EntityError::FloatParse),
     }
 }
 
@@ -173,14 +191,14 @@ fn take_prop(key: &'static str, claim: &mut json::JsonValue) -> json::JsonValue 
     claim.remove(key)
 }
 
-fn parse_wb_time(time: &str) -> Option<chrono::DateTime<chrono::offset::Utc>> {
+fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, EntityError> {
     if time.is_empty() {
-        return None;
+        return Err(EntityError::TimeEmpty);
     }
 
     // "Negative years are allowed in formatting but not in parsing.", so we
     // set the era ourselves, after parsing
-    let is_ce = time.chars().next()? == '+';
+    let is_ce = time.chars().next().ok_or(EntityError::TimeEmpty)? == '+';
     let time = &time[1..];
 
     let time_parts: Vec<&str> = time.split('T').collect();
@@ -188,7 +206,7 @@ fn parse_wb_time(time: &str) -> Option<chrono::DateTime<chrono::offset::Utc>> {
     // could be wrong maybe if the percision is more than a year, meh
     let year: i32 = match dash_parts[0].parse() {
         Ok(x) => x,
-        Err(_) => return None,
+        Err(_) => return Err(EntityError::NoDateYear),
     };
     let year: i32 = year * (if is_ce { 1 } else { -1 });
     let month: Option<u32> = match dash_parts.get(1) {
@@ -208,44 +226,45 @@ fn parse_wb_time(time: &str) -> Option<chrono::DateTime<chrono::offset::Utc>> {
     let maybe_date = Utc.ymd_opt(year, month.unwrap_or(1), day.unwrap_or(1));
     let date = match maybe_date {
         chrono::offset::LocalResult::Single(date) => date,
-        _ => return None, //  matched zero dates or matched multiple
+        chrono::offset::LocalResult::None => return Err(EntityError::NoDateMatched),
+        chrono::offset::LocalResult::Ambiguous(_, _) => return Err(EntityError::DateAmbiguous),
     };
     let (hour, min, sec) = if time_parts.len() == 2 {
         let colon_parts: Vec<&str> = time_parts[1].split(':').collect();
-        let hour = match colon_parts.get(0)?.parse() {
+        let hour = match colon_parts.get(0).ok_or(EntityError::MissingHour)?.parse() {
             Ok(x) => x,
-            Err(_) => return None,
+            Err(_) => return Err(EntityError::FloatParse),
         };
-        let minute = match colon_parts.get(1)?.parse() {
+        let minute = match colon_parts
+            .get(1)
+            .ok_or(EntityError::MissingMinute)?
+            .parse()
+        {
             Ok(x) => x,
-            Err(_) => return None,
+            Err(_) => return Err(EntityError::FloatParse),
         };
-        let sec = match colon_parts.get(2)?[0..2].parse() {
+        let sec = match colon_parts.get(2).ok_or(EntityError::MissingSecond)?[0..2].parse() {
             Ok(x) => x,
-            Err(_) => return None,
+            Err(_) => return Err(EntityError::FloatParse),
         };
         (hour, minute, sec)
     } else {
         (0, 0, 0)
     };
-    Some(date.and_hms(hour, min, sec))
+    Ok(date.and_hms(hour, min, sec))
 }
 
 impl ClaimValueData {
-    #[must_use]
-    /// Parses a snak, panics on failure.
-    pub fn parse_snak(mut snak: json::JsonValue) -> Option<Self> {
+    /// Parses a snak.
+    pub fn parse_snak(mut snak: json::JsonValue) -> Result<Self, EntityError> {
         let mut datavalue: json::JsonValue = take_prop("datavalue", &mut snak);
-        let datatype: &str = &get_json_string(take_prop("datatype", &mut snak));
-        let snaktype: &str = &get_json_string(take_prop("snaktype", &mut snak));
+        let datatype: &str = &get_json_string(take_prop("datatype", &mut snak))?;
+        let snaktype: &str = &get_json_string(take_prop("snaktype", &mut snak))?;
         match snaktype {
             "value" => {}
-            "somevalue" => return Some(ClaimValueData::UnknownValue),
-            "novalue" => return Some(ClaimValueData::NoValue),
-            x => panic!(
-                "Expected snaktype to be value, somevalue, or novalue, but it was {}",
-                x
-            ),
+            "somevalue" => return Ok(ClaimValueData::UnknownValue),
+            "novalue" => return Ok(ClaimValueData::NoValue),
+            _ => return Err(EntityError::InvalidSnaktype),
         };
         let type_str = take_prop("type", &mut datavalue)
             .take_string()
@@ -257,35 +276,35 @@ impl ClaimValueData {
                     .take_string()
                     .expect("expected string, didn't find one");
                 match datatype {
-                    "string" => Some(ClaimValueData::Stringg(s)),
-                    "commonsMedia" => Some(ClaimValueData::CommonsMedia(s)),
-                    "external-id" => Some(ClaimValueData::ExternalID(s)),
-                    "math" => Some(ClaimValueData::MathExpr(s)),
-                    "geo-shape" => Some(ClaimValueData::GeoShape(s)),
-                    "musical-notation" => Some(ClaimValueData::MusicNotation(s)),
-                    "tabular-data" => Some(ClaimValueData::TabularData(s)),
-                    "url" => Some(ClaimValueData::Url(s)),
+                    "string" => Ok(ClaimValueData::Stringg(s)),
+                    "commonsMedia" => Ok(ClaimValueData::CommonsMedia(s)),
+                    "external-id" => Ok(ClaimValueData::ExternalID(s)),
+                    "math" => Ok(ClaimValueData::MathExpr(s)),
+                    "geo-shape" => Ok(ClaimValueData::GeoShape(s)),
+                    "musical-notation" => Ok(ClaimValueData::MusicNotation(s)),
+                    "tabular-data" => Ok(ClaimValueData::TabularData(s)),
+                    "url" => Ok(ClaimValueData::Url(s)),
                     _ => {
                         eprintln!("Invalid datatype {}", datatype);
-                        None
+                        Err(EntityError::InvalidDatatype)
                     }
                 }
             }
             "wikibase-entityid" => {
                 // the ID could be a entity, lexeme, property, form, or sense
-                let id = get_json_string(take_prop("id", &mut value));
+                let id = get_json_string(take_prop("id", &mut value))?;
                 match id.chars().next().expect("Entity ID was empty string") {
-                    'Q' => Some(ClaimValueData::Item(Qid(id[1..]
+                    'Q' => Ok(ClaimValueData::Item(Qid(id[1..]
                         .parse()
                         .expect("Malformed entity ID")))),
-                    'P' => Some(ClaimValueData::Property(Pid(id[1..]
+                    'P' => Ok(ClaimValueData::Property(Pid(id[1..]
                         .parse()
                         .expect("Malformed property ID")))),
                     'L' => {
                         // sense: "L1-S2", form: "L1-F2", lexeme: "L2"
                         let parts: Vec<&str> = id.split('-').collect();
                         match parts.len() {
-                            1 => Some(ClaimValueData::Lexeme(Lid(id[1..]
+                            1 => Ok(ClaimValueData::Lexeme(Lid(id[1..]
                                 .parse()
                                 .expect("Malformed lexeme ID")))),
                             2 => {
@@ -294,25 +313,25 @@ impl ClaimValueData {
                                     .next()
                                     .expect("Nothing after dash in lexeme ID")
                                 {
-                                    'F' => Some(ClaimValueData::Form(Fid(
+                                    'F' => Ok(ClaimValueData::Form(Fid(
                                         Lid(parts[0][1..].parse().expect("Malformed lexeme ID")),
                                         parts[1][1..].parse().expect("Invalid form ID"),
                                     ))),
-                                    'S' => Some(ClaimValueData::Sense(Sid(
+                                    'S' => Ok(ClaimValueData::Sense(Sid(
                                         Lid(parts[0][1..].parse().expect("Malformed lexeme ID")),
                                         parts[1][1..].parse().expect("Invalid sense ID"),
                                     ))),
-                                    _ => panic!("Invalid second part of lexeme ID"),
+                                    _ => Err(EntityError::BadId),
                                 }
                             }
-                            _ => panic!("Lexeme ID had more than 1 dash"),
+                            _ => Err(EntityError::BadId),
                         }
                     }
-                    _ => panic!("Couldn't parse entity ID"),
+                    _ => Err(EntityError::BadId),
                 }
             }
             "globecoordinate" => {
-                Some(ClaimValueData::GlobeCoordinate {
+                Ok(ClaimValueData::GlobeCoordinate {
                     lat: parse_wb_number(&take_prop("latitude", &mut value))?,
                     lon: parse_wb_number(&take_prop("longitude", &mut value))?,
                     // altitude field is deprecated and we ignore it
@@ -322,26 +341,26 @@ impl ClaimValueData {
                     globe: try_get_as_qid(&take_prop("globe", &mut value))?,
                 })
             }
-            "quantity" => Some(ClaimValueData::Quantity {
+            "quantity" => Ok(ClaimValueData::Quantity {
                 amount: parse_wb_number(&take_prop("amount", &mut value))?,
-                upper_bound: parse_wb_number(&take_prop("upperBound", &mut value)),
-                lower_bound: parse_wb_number(&take_prop("lowerBound", &mut value)),
-                unit: try_get_as_qid(&take_prop("unit", &mut value)),
+                upper_bound: parse_wb_number(&take_prop("upperBound", &mut value)).ok(),
+                lower_bound: parse_wb_number(&take_prop("lowerBound", &mut value)).ok(),
+                unit: try_get_as_qid(&take_prop("unit", &mut value)).ok(),
             }),
-            "time" => Some(ClaimValueData::DateTime {
+            "time" => Ok(ClaimValueData::DateTime {
                 // our time parsing code can't handle a few edge cases (really old years), so we
                 // just give up on parsing the snak if parse_wb_time returns None
-                date_time: parse_wb_time(&get_json_string(take_prop("time", &mut value)))?,
+                date_time: parse_wb_time(&get_json_string(take_prop("time", &mut value))?)?,
                 precision: parse_wb_number(&take_prop("precision", &mut value))
                     .expect("Invalid precision {}") as u8,
             }),
-            "monolingualtext" => Some(ClaimValueData::MonolingualText {
-                text: get_json_string(take_prop("text", &mut value)),
-                lang: get_json_string(take_prop("language", &mut value)),
+            "monolingualtext" => Ok(ClaimValueData::MonolingualText {
+                text: get_json_string(take_prop("text", &mut value))?,
+                lang: get_json_string(take_prop("language", &mut value))?,
             }),
             other => {
                 eprintln!("Couldn't parse data type {}", other);
-                None
+                Err(EntityError::UnknownDatatype)
             }
         }
     }
@@ -359,23 +378,17 @@ impl ClaimValue {
             }
             "normal" => Rank::Normal,
             "preferred" => Rank::Preferred,
-            other => panic!("Invalid rank {}", other),
+            _ => return None,
         };
         let mainsnak = take_prop("mainsnak", &mut claim);
-        let data = match ClaimValueData::parse_snak(mainsnak) {
-            Some(x) => x,
-            None => {
-                eprintln!("Failed to parse mainsnak");
-                return None;
-            }
-        };
+        let data = ClaimValueData::parse_snak(mainsnak).ok()?;
         let references_json = take_prop("references", &mut claim);
         let references = if references_json.is_array() {
             let mut v: Vec<ReferenceGroup> = Vec::with_capacity(references_json.len());
             let mut references_vec = if let json::JsonValue::Array(a) = references_json {
                 a
             } else {
-                panic!("references not an array");
+                return None;
             };
             for mut reference_group in references_vec.drain(..) {
                 let mut claims = Vec::with_capacity(reference_group["snaks"].len());
@@ -387,9 +400,9 @@ impl ClaimValue {
                         // clone, meh
                         let owned_snak = snak.clone().take();
                         match ClaimValueData::parse_snak(owned_snak) {
-                            Some(x) => claims
+                            Ok(x) => claims
                                 .push((Pid(pid[1..].parse().expect("Invalid property ID")), x)),
-                            None => {
+                            Err(_) => {
                                 eprintln!("Failed to parse reference snak");
                             }
                         }
@@ -411,12 +424,12 @@ impl ClaimValue {
                     if let json::JsonValue::Array(x) = claim_array_json.clone().take() {
                         x
                     } else {
-                        panic!("qualifiers doesn't have a claim array");
+                        return None;
                     };
                 for claim in claim_array.drain(..) {
                     match ClaimValueData::parse_snak(claim) {
-                        Some(x) => v.push((Pid(pid[1..].parse().expect("Invalid property ID")), x)),
-                        None => {
+                        Ok(x) => v.push((Pid(pid[1..].parse().expect("Invalid property ID")), x)),
+                        Err(_) => {
                             eprintln!("Failed to parse qualifier snak");
                         }
                     };
@@ -466,11 +479,11 @@ mod test {
         for time in valid_times {
             println!("Trying \"{}\"", time);
             assert!(match parse_wb_time(time) {
-                Some(val) => {
+                Ok(val) => {
                     println!("Got {:#?}", val);
                     true
                 }
-                None => false,
+                Err(_) => false,
             });
         }
     }
@@ -479,6 +492,6 @@ mod test {
     fn as_qid_test() {
         let qid =
             try_get_as_qid(&json::parse(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap());
-        assert_eq!(qid, Some(Qid(1234567)));
+        assert_eq!(qid, Ok(Qid(1234567)));
     }
 }
