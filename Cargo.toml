@@ -3,6 +3,9 @@ name = "wikidata"
 version = "0.1.0"
 authors = ["Smitty <me@smitop.com>"]
 edition = "2018"
+repository = "https://github.com/Smittyvb/wikidata/"
+license = "Apache-2.0"
+description = "A library for working with Wikidata in Rust"
 
 [dependencies]
 chrono = { version = "0.4.19", features = ["std", "serde"], default-features = false }
