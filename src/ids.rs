@@ -382,7 +382,7 @@ pub mod test {
             "https://www.wikidata.org/wiki/Special:EntityData/Q42.json"
         );
         assert_eq!(
-            prop.json_url(),
+            Pid(31).json_url(),
             "https://www.wikidata.org/wiki/Special:EntityData/P31.json"
         );
         assert_eq!(
