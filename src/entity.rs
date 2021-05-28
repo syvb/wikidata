@@ -6,43 +6,72 @@ use serde::{Deserialize, Serialize};
 /// A Wikibase entity: this could be an entity, property, or lexeme.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
+    /// All of the claims on the entity.
     pub claims: Vec<(Pid, ClaimValue)>,
+    /// The type of the entity.
     pub entity_type: EntityType,
-    pub description: Text,
+    /// All of the descriptions in all known languages.
+    pub description: Vec<Text>,
+    /// All of the labels in all known languages.
+    pub labels: Vec<Text>,
 }
 
+/// The type of entity: normal entity with a Qid, a property with a Pid, or a lexeme with a Lid.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum EntityType {
+    /// An entity with a Qid.
     Entity,
+    /// An entity with a Pid.
     Property,
+    /// An entity with a Lid.
     Lexeme,
 }
 
 /// Data relating to a claim value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClaimValueData {
+    /// The ID of a file on Wikimedia Commons.
     CommonsMedia(String),
+    /// Coordinates on some globe.
     GlobeCoordinate {
-        //supported
+        /// Latitude.
         lat: f64,
+        /// Longitude.
         lon: f64,
+        /// How many degrees of distance of precision there are.
         precision: f64,
+        /// The globe the coordnaties are on, usually usually Q2 for Earth.
         globe: Qid,
     },
+    /// A Wikidata item.
     Item(Qid),
+    /// A Wikidata property.
     Property(Pid),
+    /// A language-less string of text.
     Stringg(String),
+    /// Text with a language.
     MonolingualText(Text),
+    /// The same text, translated across multiple languages.
     MultilingualText(Vec<Text>),
+    /// An external identifier.
     ExternalID(String),
+    /// Some numeric quantity of something.
     Quantity {
+        /// How much.
         amount: f64, // technically it could exceed the bound, but meh
+        /// The lowest possible value. If this isn't present then it is exactly the amount.
         lower_bound: Option<f64>,
+        /// The highest possible value. If this isn't present then it is exactly the amount.
         upper_bound: Option<f64>,
+        /// The units used.
         unit: Option<Qid>, // *could* be any IRI but in practice almost all are Wikidata entity IRIs
     },
+    /// A point in time time.
     DateTime {
+        /// The time as a Chrono DateTime.
         date_time: DateTime<chrono::offset::Utc>,
+        /// The precision of the date:
         /// 0 - billion years
         /// 1 - 100 million years
         /// 2 - 10 million years
@@ -60,15 +89,25 @@ pub enum ClaimValueData {
         /// 14 - second (deprecated)
         precision: u8,
     },
+    /// A URL.
     Url(String),
+    /// A LaTeX math expression.
     MathExpr(String),
+    /// A geometric shape. The value of the string is currently unspecified.
     GeoShape(String),
+    /// LilyPond musical notation.
     MusicNotation(String),
+    /// ID of a file with tabular data on Wikimedia commons.
     TabularData(String),
+    /// A lexeme ID on Wikidata.
     Lexeme(Lid),
+    /// A form ID on Wikidata.
     Form(Fid),
+    /// A sense ID on Wikidata.
     Sense(Sid),
+    /// No value.
     NoValue,
+    /// Unknown value.
     UnknownValue,
 }
 
@@ -95,20 +134,24 @@ impl Default for Rank {
 /// A group of claims that make up a single reference.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReferenceGroup {
+    /// All of the claims.
     pub claims: Vec<(Pid, ClaimValueData)>,
 }
 
 /// A claim value.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClaimValue {
+    /// The data of the claim.
     pub data: ClaimValueData,
     pub rank: Rank,
+    /// The globally unique claim ID.
     pub id: String,
     pub qualifiers: Vec<(Pid, ClaimValueData)>,
     pub references: Vec<ReferenceGroup>,
 }
 
 impl Entity {
+    /// All of the values of "instance of" on the entity.
     pub fn instances(&self) -> Vec<Qid> {
         let mut instances = Vec::with_capacity(1);
         for (pid, claim) in &self.claims {
@@ -122,6 +165,7 @@ impl Entity {
         instances
     }
 
+    /// When the entity started existing.
     pub fn start_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
             if *pid == consts::DATE_OF_BIRTH {
@@ -133,6 +177,7 @@ impl Entity {
         None
     }
 
+    /// When the entity stopped existing.
     pub fn end_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
             if *pid == consts::DATE_OF_DEATH {
@@ -145,6 +190,7 @@ impl Entity {
     }
 }
 
+/// An error related to entity parsing/creation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum EntityError {
@@ -369,6 +415,7 @@ impl ClaimValueData {
 }
 
 impl ClaimValue {
+    /// Try to parse a JSON claim to a claim value.
     #[must_use]
     pub fn get_prop_from_snak(mut claim: json::JsonValue, skip_id: bool) -> Option<ClaimValue> {
         let claim_str = take_prop("rank", &mut claim)

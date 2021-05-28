@@ -3,9 +3,12 @@
 use serde::{Deserialize, Serialize};
 use std::{num::ParseIntError, str::FromStr};
 
+/// An error parsing an ID.
 #[derive(Debug, Clone)]
 pub enum IdParseError {
+    /// The number couldn't be parsed.
     UnparseableNumber(ParseIntError),
+    /// The ID had an invalid prefix letter.
     InvalidPrefix,
 }
 
@@ -14,6 +17,8 @@ macro_rules! id_def {
         #[derive(
             Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
+        #[doc = "A Wikidata"]
+        #[doc = $full_name]
         pub struct $name(pub u64);
 
         impl $name {
@@ -50,6 +55,7 @@ macro_rules! id_def {
             }
         }
         impl std::fmt::Display for $name {
+            /// Display the ID as it would be in a URI.
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, concat!($letter, "{}"), self.0)
             }
@@ -63,15 +69,14 @@ id_def!(Lid, "lexeme ID", "L");
 
 /// A lexeme ID and associated form ID
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-// see id_def! comment about datatype
 pub struct Fid(pub Lid, pub u16);
 
 /// A lexeme ID and assoicated sense ID
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-// see id_def! comment about datatype
 pub struct Sid(pub Lid, pub u16);
 
 impl ToString for Fid {
+    /// Display the ID as it would be in a URI.
     #[must_use]
     fn to_string(&self) -> String {
         match self {
@@ -81,6 +86,7 @@ impl ToString for Fid {
 }
 
 impl ToString for Sid {
+    /// Display the ID as it would be in a URI.
     #[must_use]
     fn to_string(&self) -> String {
         match self {
@@ -107,7 +113,7 @@ macro_rules! pid_consts (
 macro_rules! qid_unit_suffixes {
     { $($key:ident => $value:expr),+, } => {
         #[must_use]
-        pub fn unit_suffix(qid: Qid) -> Option<&'static str> {
+        pub(super) fn unit_suffix(qid: Qid) -> Option<&'static str> {
             $(
                 if qid == $key {
                     Some($value)
@@ -118,6 +124,13 @@ macro_rules! qid_unit_suffixes {
             }
         }
     };
+}
+
+impl Qid {
+    /// If the Qid is a commonly used unit on Wikidata, get it as a unit suffix.
+    pub fn unit_suffix(self) -> Option<&'static str> {
+        consts::unit_suffix(self)
+    }
 }
 
 #[allow(clippy::unreadable_literal)]
