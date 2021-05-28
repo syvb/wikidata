@@ -1,5 +1,5 @@
 use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid};
-use crate::text::{Text, Lang};
+use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -328,9 +328,7 @@ impl ClaimValueData {
         let mut value = take_prop("value", &mut datavalue);
         match &type_str[..] {
             "string" => {
-                let s = value
-                    .take_string()
-                    .ok_or(EntityError::ExpectedString)?;
+                let s = value.take_string().ok_or(EntityError::ExpectedString)?;
                 match datatype {
                     "string" => Ok(ClaimValueData::Stringg(s)),
                     "commonsMedia" => Ok(ClaimValueData::CommonsMedia(s)),
@@ -360,23 +358,17 @@ impl ClaimValueData {
                             1 => Ok(ClaimValueData::Lexeme(Lid(id[1..]
                                 .parse()
                                 .map_err(|_| EntityError::BadId)?))),
-                            2 => {
-                                match parts[1]
-                                    .chars()
-                                    .next()
-                                    .ok_or(EntityError::BadId)?
-                                {
-                                    'F' => Ok(ClaimValueData::Form(Fid(
-                                        Lid(parts[0][1..].parse().map_err(|_| EntityError::BadId)?),
-                                        parts[1][1..].parse().map_err(|_| EntityError::BadId)?,
-                                    ))),
-                                    'S' => Ok(ClaimValueData::Sense(Sid(
-                                        Lid(parts[0][1..].parse().map_err(|_| EntityError::BadId)?),
-                                        parts[1][1..].parse().map_err(|_| EntityError::BadId)?,
-                                    ))),
-                                    _ => Err(EntityError::BadId),
-                                }
-                            }
+                            2 => match parts[1].chars().next().ok_or(EntityError::BadId)? {
+                                'F' => Ok(ClaimValueData::Form(Fid(
+                                    Lid(parts[0][1..].parse().map_err(|_| EntityError::BadId)?),
+                                    parts[1][1..].parse().map_err(|_| EntityError::BadId)?,
+                                ))),
+                                'S' => Ok(ClaimValueData::Sense(Sid(
+                                    Lid(parts[0][1..].parse().map_err(|_| EntityError::BadId)?),
+                                    parts[1][1..].parse().map_err(|_| EntityError::BadId)?,
+                                ))),
+                                _ => Err(EntityError::BadId),
+                            },
                             _ => Err(EntityError::BadId),
                         }
                     }
@@ -420,8 +412,7 @@ impl ClaimValue {
     /// Try to parse a JSON claim to a claim value.
     #[must_use]
     pub fn get_prop_from_snak(mut claim: json::JsonValue, skip_id: bool) -> Option<ClaimValue> {
-        let claim_str = take_prop("rank", &mut claim)
-            .take_string()?;
+        let claim_str = take_prop("rank", &mut claim).take_string()?;
         let rank = match &claim_str[..] {
             "deprecated" => {
                 return None;
@@ -450,8 +441,7 @@ impl ClaimValue {
                         // clone, meh
                         let owned_snak = snak.clone().take();
                         match ClaimValueData::parse_snak(owned_snak) {
-                            Ok(x) => claims
-                                .push((Pid(pid[1..].parse().ok()?), x)),
+                            Ok(x) => claims.push((Pid(pid[1..].parse().ok()?), x)),
                             Err(_) => {}
                         }
                     }
