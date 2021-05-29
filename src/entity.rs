@@ -210,8 +210,14 @@ pub enum EntityError {
     FloatParse,
     /// A string was expected but not found
     ExpectedString,
+    /// Expected string repersenting number
+    ExpectedNumberString,
+    /// Expected string repersenting URI
+    ExpectedUriString,
     /// A valid Qid URI was expected but not found
     ExpectedQidString,
+    /// Expected a string because the datatype is string
+    ExpectedStringDatatype,
     /// A time string was empty
     TimeEmpty,
     /// An ID was invalid
@@ -249,7 +255,7 @@ fn parse_wb_number(num: &json::JsonValue) -> Result<f64, EntityError> {
     if num.is_number() {
         Ok(num.as_number().ok_or(EntityError::FloatParse)?.into())
     } else {
-        let s = num.as_str().ok_or(EntityError::ExpectedString)?;
+        let s = num.as_str().ok_or(EntityError::ExpectedNumberString)?;
         match s.parse() {
             Ok(x) => Ok(x),
             Err(_) => Err(EntityError::FloatParse),
@@ -260,7 +266,7 @@ fn parse_wb_number(num: &json::JsonValue) -> Result<f64, EntityError> {
 fn try_get_as_qid(datavalue: &json::JsonValue) -> Result<Qid, EntityError> {
     match datavalue
         .as_str()
-        .ok_or(EntityError::ExpectedString)?
+        .ok_or(EntityError::ExpectedUriString)?
         .split("http://www.wikidata.org/entity/Q")
         .nth(1)
         .ok_or(EntityError::ExpectedQidString)?
@@ -359,7 +365,9 @@ impl ClaimValueData {
         let mut value = take_prop("value", &mut datavalue);
         match &type_str[..] {
             "string" => {
-                let s = value.take_string().ok_or(EntityError::ExpectedString)?;
+                let s = value
+                    .take_string()
+                    .ok_or(EntityError::ExpectedStringDatatype)?;
                 match datatype {
                     "string" => Ok(ClaimValueData::String(s)),
                     "commonsMedia" => Ok(ClaimValueData::CommonsMedia(s)),
