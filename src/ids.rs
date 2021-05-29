@@ -107,9 +107,9 @@ macro_rules! pid_consts (
 macro_rules! qid_unit_suffixes {
     { $($key:ident => $value:expr),+, } => {
         #[must_use]
-        pub(super) fn unit_suffix(qid: Qid) -> Option<&'static str> {
+        pub(super) const fn unit_suffix(qid: Qid) -> Option<&'static str> {
             $(
-                if qid == $key {
+                if qid.0 == ($key).0 {
                     Some($value)
                 } else
             )+
@@ -123,7 +123,7 @@ macro_rules! qid_unit_suffixes {
 impl Qid {
     /// If the Qid is a commonly used unit on Wikidata, get it as a unit suffix.
     #[must_use]
-    pub fn unit_suffix(self) -> Option<&'static str> {
+    pub const fn unit_suffix(self) -> Option<&'static str> {
         consts::unit_suffix(self)
     }
 }
