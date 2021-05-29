@@ -2,6 +2,7 @@ use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid};
 use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// A Wikibase entity: this could be an entity, property, or lexeme.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,26 +245,30 @@ pub enum EntityError {
     InvalidPrecision,
     /// No rank was specified
     NoRank,
+    /// A number was out of bounds
+    NumberOutOfBounds,
+    /// No ID was found
+    NoId,
 }
 
-fn get_json_string(mut json: json::JsonValue) -> Result<String, EntityError> {
-    json.take_string().ok_or(EntityError::ExpectedString)
+fn get_json_string(json: Value) -> Result<String, EntityError> {
+    json.as_str().map(ToString::to_string).ok_or(EntityError::ExpectedString)
 }
 
-fn parse_wb_number(num: &json::JsonValue) -> Result<f64, EntityError> {
-    // could be a string repersenting a number, or a number
-    if num.is_number() {
-        Ok(num.as_number().ok_or(EntityError::FloatParse)?.into())
-    } else {
-        let s = num.as_str().ok_or(EntityError::ExpectedNumberString)?;
-        match s.parse() {
-            Ok(x) => Ok(x),
-            Err(_) => Err(EntityError::FloatParse),
+fn parse_wb_number(num: &Value) -> Result<f64, EntityError> {
+    match num {
+        Value::Number(num) => num.as_f64().ok_or(EntityError::NumberOutOfBounds),
+        Value::String(s) => {
+            match s.parse() {
+                Ok(x) => Ok(x),
+                Err(_) => Err(EntityError::FloatParse),
+            }
         }
+        _ => Err(EntityError::ExpectedNumberString)
     }
 }
 
-fn try_get_as_qid(datavalue: &json::JsonValue) -> Result<Qid, EntityError> {
+fn try_get_as_qid(datavalue: &Value) -> Result<Qid, EntityError> {
     match datavalue
         .as_str()
         .ok_or(EntityError::ExpectedUriString)?
@@ -277,8 +282,11 @@ fn try_get_as_qid(datavalue: &json::JsonValue) -> Result<Qid, EntityError> {
     }
 }
 
-fn take_prop(key: &'static str, claim: &mut json::JsonValue) -> json::JsonValue {
-    claim.remove(key)
+fn take_prop(key: &'static str, claim: &mut Value) -> Value {
+    match claim.as_object_mut() {
+        Some(obj) => obj.remove(key).unwrap_or(Value::Null),
+        None => Value::Null,
+    }
 }
 
 fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, EntityError> {
@@ -349,8 +357,8 @@ impl ClaimValueData {
     ///
     /// # Errors
     /// If the `snak` does not correspond to a valid snak, then an error will be returned.
-    pub fn parse_snak(mut snak: json::JsonValue) -> Result<Self, EntityError> {
-        let mut datavalue: json::JsonValue = take_prop("datavalue", &mut snak);
+    pub fn parse_snak(mut snak: Value) -> Result<Self, EntityError> {
+        let mut datavalue: Value = take_prop("datavalue", &mut snak);
         let datatype: &str = &get_json_string(take_prop("datatype", &mut snak))?;
         let snaktype: &str = &get_json_string(take_prop("snaktype", &mut snak))?;
         match snaktype {
@@ -360,14 +368,16 @@ impl ClaimValueData {
             _ => return Err(EntityError::InvalidSnaktype),
         };
         let type_str = take_prop("type", &mut datavalue)
-            .take_string()
-            .ok_or(EntityError::InvalidSnaktype)?;
+            .as_str()
+            .ok_or(EntityError::InvalidSnaktype)?
+            .to_string();
         let mut value = take_prop("value", &mut datavalue);
         match &type_str[..] {
             "string" => {
                 let s = value
-                    .take_string()
-                    .ok_or(EntityError::ExpectedStringDatatype)?;
+                    .as_str()
+                    .ok_or(EntityError::ExpectedStringDatatype)?
+                    .to_string();
                 match datatype {
                     "string" => Ok(ClaimValueData::String(s)),
                     "commonsMedia" => Ok(ClaimValueData::CommonsMedia(s)),
@@ -450,9 +460,8 @@ impl ClaimValueData {
 impl ClaimValue {
     /// Try to parse a JSON claim to a claim value.
     #[must_use]
-    pub fn get_prop_from_snak(mut claim: json::JsonValue, skip_id: bool) -> Option<ClaimValue> {
-        let claim_str = take_prop("rank", &mut claim).take_string()?;
-        let rank = match &claim_str[..] {
+    pub fn get_prop_from_snak(mut claim: Value, skip_id: bool) -> Option<ClaimValue> {
+        let rank = match take_prop("rank", &mut claim).as_str()? {
             "deprecated" => {
                 return None;
             }
@@ -462,21 +471,14 @@ impl ClaimValue {
         };
         let mainsnak = take_prop("mainsnak", &mut claim);
         let data = ClaimValueData::parse_snak(mainsnak).ok()?;
-        let references_json = take_prop("references", &mut claim);
-        let references = if references_json.is_array() {
-            let mut v: Vec<ReferenceGroup> = Vec::with_capacity(references_json.len());
-            let mut references_vec = if let json::JsonValue::Array(a) = references_json {
-                a
-            } else {
-                return None;
-            };
-            for mut reference_group in references_vec.drain(..) {
-                let mut claims = Vec::with_capacity(reference_group["snaks"].len());
-                let snaks = take_prop("snaks", &mut reference_group);
-                let mut entries: Vec<(&str, &json::JsonValue)> = snaks.entries().collect();
-                for (pid, snak_group) in entries.drain(..) {
-                    let mut members: Vec<&json::JsonValue> = snak_group.members().collect();
-                    for snak in members.drain(..) {
+        let references = if let Some(arr) = take_prop("references", &mut claim).as_array() {
+            let mut v: Vec<ReferenceGroup> = Vec::with_capacity(arr.len());
+            for reference_group in arr {
+                let reference_group = reference_group.as_object()?;
+                let mut claims = Vec::with_capacity(reference_group["snaks"].as_array()?.len());
+                let snaks = reference_group["snaks"].as_object()?;
+                for (pid, snak_group) in snaks.iter() {
+                    for snak in snak_group.as_array()?.iter() {
                         // clone, meh
                         let owned_snak = snak.clone().take();
                         if let Ok(x) = ClaimValueData::parse_snak(owned_snak) {
@@ -487,17 +489,17 @@ impl ClaimValue {
                 v.push(ReferenceGroup { claims });
             }
             v
+
         } else {
-            vec![]
+            Vec::new()
         };
         let qualifiers_json = take_prop("qualifiers", &mut claim);
         let qualifiers = if qualifiers_json.is_object() {
             let mut v: Vec<(Pid, ClaimValueData)> = vec![];
-            let mut entries: Vec<(&str, &json::JsonValue)> = qualifiers_json.entries().collect();
-            for (pid, claim_array_json) in entries.drain(..) {
+            for (pid, claim_array_json) in qualifiers_json.as_object()?.iter() {
                 // yep it's a clone, meh
                 let mut claim_array =
-                    if let json::JsonValue::Array(x) = claim_array_json.clone().take() {
+                    if let Value::Array(x) = claim_array_json.clone().take() {
                         x
                     } else {
                         return None;
@@ -518,8 +520,8 @@ impl ClaimValue {
                 String::new()
             } else {
                 take_prop("id", &mut claim)
-                    .take_string()
-                    .expect("No id on snak")
+                    .as_str()?
+                    .to_string()
             },
             data,
             references,
@@ -564,7 +566,7 @@ mod test {
     #[test]
     fn as_qid_test() {
         let qid =
-            try_get_as_qid(&json::parse(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap());
+            try_get_as_qid(&serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap());
         assert_eq!(qid, Ok(Qid(1234567)));
     }
 }
