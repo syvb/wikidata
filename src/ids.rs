@@ -75,9 +75,7 @@ impl ToString for Fid {
     /// Display the ID as it would be in a URI.
     #[must_use]
     fn to_string(&self) -> String {
-        match self {
-            Fid(Lid(lid), fid) => format!("L{}-F{}", lid, fid),
-        }
+        format!("{}-F{}", self.0, self.1)
     }
 }
 
@@ -85,9 +83,7 @@ impl ToString for Sid {
     /// Display the ID as it would be in a URI.
     #[must_use]
     fn to_string(&self) -> String {
-        match self {
-            Sid(Lid(lid), sid) => format!("L{}-S{}", lid, sid),
-        }
+        format!("{}-S{}", self.0, self.1)
     }
 }
 
