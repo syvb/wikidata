@@ -25,18 +25,14 @@ macro_rules! id_def {
             /// Get the URL to access data about the claim on Wikidata.
             #[must_use]
             pub fn json_url(&self) -> String {
-                let mut ret = String::new();
-                ret.push_str(concat!(
-                    "https://www.wikidata.org/wiki/Special:EntityData/",
-                    $letter
-                ));
-                match self {
-                    $name(num) => {
-                        ret.push_str(&num.to_string());
-                    }
-                }
-                ret.push_str(".json");
-                ret
+                format!(
+                    concat!(
+                        "https://www.wikidata.org/wiki/Special:EntityData/",
+                        $letter,
+                        "{}.json"
+                    ),
+                    self.0
+                )
             }
         }
         impl FromStr for $name {
