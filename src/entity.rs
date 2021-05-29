@@ -30,7 +30,7 @@ pub enum EntityType {
 }
 
 /// Data relating to a claim value.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ClaimValueData {
     /// The ID of a file on Wikimedia Commons.
     CommonsMedia(String),
@@ -252,19 +252,19 @@ pub enum EntityError {
 }
 
 fn get_json_string(json: Value) -> Result<String, EntityError> {
-    json.as_str().map(ToString::to_string).ok_or(EntityError::ExpectedString)
+    json.as_str()
+        .map(ToString::to_string)
+        .ok_or(EntityError::ExpectedString)
 }
 
 fn parse_wb_number(num: &Value) -> Result<f64, EntityError> {
     match num {
         Value::Number(num) => num.as_f64().ok_or(EntityError::NumberOutOfBounds),
-        Value::String(s) => {
-            match s.parse() {
-                Ok(x) => Ok(x),
-                Err(_) => Err(EntityError::FloatParse),
-            }
-        }
-        _ => Err(EntityError::ExpectedNumberString)
+        Value::String(s) => match s.parse() {
+            Ok(x) => Ok(x),
+            Err(_) => Err(EntityError::FloatParse),
+        },
+        _ => Err(EntityError::ExpectedNumberString),
     }
 }
 
@@ -489,7 +489,6 @@ impl ClaimValue {
                 v.push(ReferenceGroup { claims });
             }
             v
-
         } else {
             Vec::new()
         };
@@ -498,12 +497,11 @@ impl ClaimValue {
             let mut v: Vec<(Pid, ClaimValueData)> = vec![];
             for (pid, claim_array_json) in qualifiers_json.as_object()?.iter() {
                 // yep it's a clone, meh
-                let mut claim_array =
-                    if let Value::Array(x) = claim_array_json.clone().take() {
-                        x
-                    } else {
-                        return None;
-                    };
+                let mut claim_array = if let Value::Array(x) = claim_array_json.clone().take() {
+                    x
+                } else {
+                    return None;
+                };
                 for claim in claim_array.drain(..) {
                     if let Ok(x) = ClaimValueData::parse_snak(claim) {
                         v.push((Pid(pid[1..].parse().ok()?), x))
@@ -519,9 +517,7 @@ impl ClaimValue {
             id: if skip_id {
                 String::new()
             } else {
-                take_prop("id", &mut claim)
-                    .as_str()?
-                    .to_string()
+                take_prop("id", &mut claim).as_str()?.to_string()
             },
             data,
             references,
@@ -565,8 +561,9 @@ mod test {
 
     #[test]
     fn as_qid_test() {
-        let qid =
-            try_get_as_qid(&serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap());
+        let qid = try_get_as_qid(
+            &serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap(),
+        );
         assert_eq!(qid, Ok(Qid(1234567)));
     }
 }
