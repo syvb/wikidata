@@ -528,10 +528,18 @@ fn get_json_string(json: Value) -> Result<String, EntityError> {
 fn parse_wb_number(num: &Value) -> Result<f64, EntityError> {
     match num {
         Value::Number(num) => num.as_f64().ok_or(EntityError::NumberOutOfBounds),
-        Value::String(s) => match s.parse() {
-            Ok(x) => Ok(x),
-            Err(_) => Err(EntityError::FloatParse),
-        },
+        Value::String(s) => {
+            // "+1" is a valid Wikibase number
+            let s = if let Some(b'+') = s.bytes().next() {
+                &s[1..]
+            } else {
+                &s[..]
+            };
+            match s.parse() {
+                Ok(x) => Ok(x),
+                Err(_) => Err(EntityError::FloatParse),
+            }
+        }
         _ => Err(EntityError::ExpectedNumberString),
     }
 }
@@ -694,10 +702,11 @@ impl ClaimValueData {
             }
             "globecoordinate" => {
                 Ok(ClaimValueData::GlobeCoordinate {
+                    // altitude field is deprecated and we ignore it
                     lat: parse_wb_number(&take_prop("latitude", &mut value))?,
                     lon: parse_wb_number(&take_prop("longitude", &mut value))?,
-                    // altitude field is deprecated and we ignore it
-                    precision: parse_wb_number(&take_prop("precision", &mut value))?,
+                    // sometimes precision is missing, default it to 1.0
+                    precision: parse_wb_number(&take_prop("precision", &mut value)).unwrap_or(1.0),
                     // globe *can* be any IRI, but it practice it's almost always an entity URI
                     // so we return None if it doesn't match our expectations
                     globe: try_get_as_qid(&take_prop("globe", &mut value))?,
@@ -841,5 +850,17 @@ mod test {
             &serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap(),
         );
         assert_eq!(qid, Ok(Qid(1234567)));
+    }
+
+    #[test]
+    fn number_parsing() {
+        assert_eq!(parse_wb_number(&serde_json::json!("+5")), Ok(5.));
+        assert_eq!(parse_wb_number(&serde_json::json!("5")), Ok(5.));
+        assert_eq!(parse_wb_number(&serde_json::json!("-5")), Ok(-5.));
+        assert_eq!(
+            parse_wb_number(&serde_json::json!("-81.12683")),
+            Ok(-81.12683)
+        );
+        assert_eq!(parse_wb_number(&serde_json::json!("+0")), Ok(0.));
     }
 }

@@ -30,3 +30,9 @@ fn mount_everest() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q513.json")).unwrap();
     Entity::from_json(j).unwrap();
 }
+
+#[test]
+fn portugal() {
+    let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q45.json")).unwrap();
+    Entity::from_json(j).unwrap();
+}
