@@ -1,3 +1,5 @@
+use std::{collections::BTreeMap, str::FromStr};
+
 use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid};
 use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
@@ -5,16 +7,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// A Wikibase entity: this could be an entity, property, or lexeme.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Entity {
     /// All of the claims on the entity.
     pub claims: Vec<(Pid, ClaimValue)>,
     /// The type of the entity.
     pub entity_type: EntityType,
     /// All of the descriptions in all known languages.
-    pub description: Vec<Text>,
+    pub descriptions: BTreeMap<Lang, String>,
     /// All of the labels in all known languages.
-    pub labels: Vec<Text>,
+    pub labels: BTreeMap<Lang, String>,
+    /// Known aliases of the item
+    pub aliases: BTreeMap<Lang, Vec<String>>,
 }
 
 /// The type of entity: normal entity with a Qid, a property with a Pid, or a lexeme with a Lid.
@@ -138,15 +142,30 @@ impl Default for Rank {
     }
 }
 
+impl FromStr for Rank {
+    type Err = EntityError;
+
+    fn from_str(x: &str) -> Result<Self, Self::Err> {
+        match x {
+            "normal" => Ok(Self::Normal),
+            "deprecated" => Ok(Self::Deprecated),
+            "preferred" => Ok(Self::Preferred),
+            _ => Err(EntityError::UnknownRank),
+        }
+    }
+}
+
 /// A group of claims that make up a single reference.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReferenceGroup {
     /// All of the claims.
     pub claims: Vec<(Pid, ClaimValueData)>,
+    /// The hash associated with the reference group.
+    pub hash: String,
 }
 
 /// A claim value.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ClaimValue {
     /// The data of the claim.
     pub data: ClaimValueData,
@@ -201,16 +220,214 @@ impl Entity {
         }
         None
     }
+
+    /// Construct an entity from the Wikibase JSON repersentation.
+    ///
+    /// # Errors
+    /// If the JSON reperesntation can't be parsed to an `Entity` an `EntityError` will be returned.
+    pub fn from_json(mut json: Value) -> Result<Self, EntityError> {
+        let mut json = match json.get_mut("entities") {
+            Some(ents) => {
+                let obj = ents.as_object_mut().ok_or(EntityError::ExpectedObject)?;
+                match obj.len() {
+                    0 => return Err(EntityError::NoEntities),
+                    1 => obj.iter_mut().next().unwrap().1.take(),
+                    _ => return Err(EntityError::MultipleEntities),
+                }
+            }
+            None => json,
+        };
+
+        macro_rules! text_keyval {
+            ($key:literal) => {{
+                match json.get($key) {
+                    Some(json_map) => {
+                        let json_map = json_map.as_object().ok_or(EntityError::ExpectedObject)?;
+                        let mut map = BTreeMap::new();
+                        for (key, val) in json_map {
+                            map.insert(
+                                Lang(key.to_string()),
+                                val.as_object()
+                                    .ok_or(EntityError::ExpectedObject)?
+                                    .get("value")
+                                    .ok_or(EntityError::ExpectedLangString)?
+                                    .as_str()
+                                    .ok_or(EntityError::ExpectedKeyvalTextString)?
+                                    .to_string(),
+                            );
+                        }
+                        map
+                    }
+                    None => BTreeMap::new(),
+                }
+            }};
+        }
+
+        let labels = text_keyval!("labels");
+        let descriptions = text_keyval!("descriptions");
+
+        let aliases = match json.get("aliases") {
+            Some(json_map) => {
+                let json_map = json_map.as_object().ok_or(EntityError::ExpectedObject)?;
+                let mut map = BTreeMap::new();
+                for (key, val) in json_map {
+                    map.insert(
+                        Lang(key.to_string()),
+                        val.as_array()
+                            .ok_or(EntityError::ExpectedAliasArray)?
+                            .iter()
+                            .filter_map(|val| {
+                                Some(
+                                    val.get("value")
+                                        .ok_or(EntityError::ExpectedTextValue)
+                                        .ok()?
+                                        .as_str()
+                                        .ok_or(EntityError::ExpectedAliasString)
+                                        .ok()?
+                                        .to_string(),
+                                )
+                            })
+                            .collect(),
+                    );
+                }
+                map
+            }
+            None => BTreeMap::new(),
+        };
+
+        let entity_type = match &json.get("type").ok_or(EntityError::NoEntityType)?.as_str() {
+            Some("item") => EntityType::Entity,
+            Some("property") => EntityType::Property,
+            Some("lexeme") => EntityType::Lexeme,
+            _ => return Err(EntityError::NoEntityType),
+        };
+
+        let mut claims = Vec::new();
+        for (pid, claim_list) in json
+            .get_mut("claims")
+            .ok_or(EntityError::NoClaims)?
+            .as_object_mut()
+            .ok_or(EntityError::ExpectedObject)?
+        {
+            let pid = Pid::from_str(pid).map_err(|_| EntityError::BadId)?;
+            for claim in claim_list
+                .as_array_mut()
+                .ok_or(EntityError::ExpectedClaimArray)?
+                .iter_mut()
+            {
+                let references =
+                    if let Some(ref_groups) = claim.get("references").and_then(Value::as_array) {
+                        let mut references = Vec::with_capacity(ref_groups.len());
+                        for group in ref_groups {
+                            let snaks = group
+                                .get("snaks")
+                                .ok_or(EntityError::NoReferenceSnaks)?
+                                .as_object()
+                                .ok_or(EntityError::ExpectedObject)?;
+                            let mut claims = Vec::with_capacity(snaks.len());
+                            for pid in group
+                                .get("snaks-order")
+                                .and_then(Value::as_array)
+                                .ok_or(EntityError::NoSnakOrder)?
+                            {
+                                let pid = pid.as_str().ok_or(EntityError::ExpectedPidString)?;
+                                for subsnak in snaks
+                                    .get(pid)
+                                    .ok_or(EntityError::SnaksOrderIncludesNonSnak)?
+                                    .as_array()
+                                    .ok_or(EntityError::ExpectedReferenceArray)?
+                                {
+                                    claims.push((
+                                        Pid::from_str(pid).map_err(|_| EntityError::BadId)?,
+                                        ClaimValueData::parse_snak(subsnak.clone())?,
+                                    ));
+                                }
+                            }
+                            claims.shrink_to_fit();
+                            references.push(ReferenceGroup {
+                                claims,
+                                hash: group
+                                    .get("hash")
+                                    .ok_or(EntityError::NoHash)?
+                                    .as_str()
+                                    .ok_or(EntityError::ExpectedHashString)?
+                                    .to_string(),
+                            })
+                        }
+                        references
+                    } else {
+                        Vec::new()
+                    };
+                let qualifiers = if let Some(order) =
+                    claim.get("qualifiers-order").and_then(Value::as_array)
+                {
+                    let qualifiers_json = claim
+                        .get("qualifiers")
+                        .ok_or(EntityError::QualifiersOrderButNoObject)?
+                        .as_object()
+                        .ok_or(EntityError::ExpectedObject)?;
+                    let mut qualifiers = Vec::new();
+                    for pid in order {
+                        let pid = pid.as_str().ok_or(EntityError::NoId)?;
+                        let pid_id = Pid::from_str(pid).map_err(|_| EntityError::BadId)?;
+                        let qual_list = qualifiers_json
+                            .get(pid)
+                            .and_then(Value::as_array)
+                            .ok_or(EntityError::QualiferOrderNamesNonQualifier)?;
+                        for qual in qual_list {
+                            qualifiers.push((pid_id, ClaimValueData::parse_snak(qual.clone())?));
+                        }
+                    }
+                    qualifiers
+                } else {
+                    Vec::new()
+                };
+                claims.push((
+                    pid,
+                    ClaimValue {
+                        id: claim
+                            .get("id")
+                            .ok_or(EntityError::NoClaimId)?
+                            .as_str()
+                            .ok_or(EntityError::NoClaimId)?
+                            .to_string(),
+                        rank: Rank::from_str(
+                            claim
+                                .get("rank")
+                                .ok_or(EntityError::NoRank)?
+                                .as_str()
+                                .ok_or(EntityError::NoRank)?,
+                        )?,
+                        data: ClaimValueData::parse_snak(claim.get_mut("mainsnak").ok_or(EntityError::MissingMainsnak)?.take())?,
+                        qualifiers,
+                        references,
+                    },
+                ));
+            }
+        }
+
+        Ok(Self {
+            claims,
+            entity_type,
+            descriptions,
+            labels,
+            aliases,
+        })
+    }
 }
 
 /// An error related to entity parsing/creation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum EntityError {
-    /// A float couldn't be parsed.
+    /// A float couldn't be parsed
     FloatParse,
     /// A string was expected but not found
     ExpectedString,
+    /// An object was expected but not found
+    ExpectedObject,
+    /// An array was expected but now found
+    ExpectedArray,
     /// Expected string repersenting number
     ExpectedNumberString,
     /// Expected string repersenting URI
@@ -249,6 +466,52 @@ pub enum EntityError {
     NumberOutOfBounds,
     /// No ID was found
     NoId,
+    /// No entities are in the object
+    NoEntities,
+    /// Multiple entities are in the object
+    MultipleEntities,
+    /// The entity had no type
+    NoEntityType,
+    /// There are no claims
+    NoClaims,
+    /// The claim ID is missing
+    NoClaimId,
+    /// That rank is unknown
+    UnknownRank,
+    /// A reference group is missing a snaks-order field
+    NoSnakOrder,
+    /// A hash is missing on a reference group
+    NoHash,
+    /// A reference group has no snaks
+    NoReferenceSnaks,
+    /// snaks-order includes a non-snak
+    SnaksOrderIncludesNonSnak,
+    /// A qualifier order exists but qulaifiers do not
+    QualifiersOrderButNoObject,
+    /// qualifier-order names property that is not a qualifier
+    QualiferOrderNamesNonQualifier,
+    /// Expected a string in a key-val entity info object (name or description)
+    ExpectedKeyvalTextString,
+    /// Expected a value in a language+value object
+    ExpectedTextValue,
+    /// An array of aliases was not found
+    ExpectedAliasArray,
+    /// An array of claims was not found
+    ExpectedClaimArray,
+    /// An array of references was not found
+    ExpectedReferenceArray,
+    /// An array of reference subsnaks was not found
+    ExpectedReferenceSubsnakArray,
+    /// A hash was expected but not found
+    ExpectedHashString,
+    /// A string representing a language was expected but not found
+    ExpectedLangString,
+    /// A string repersenting an alias was expected but not found
+    ExpectedAliasString,
+    /// A string reperesnting a Pid was expected but not found
+    ExpectedPidString,
+    /// A mainsnak is missing
+    MissingMainsnak,
 }
 
 fn get_json_string(json: Value) -> Result<String, EntityError> {
@@ -486,7 +749,10 @@ impl ClaimValue {
                         }
                     }
                 }
-                v.push(ReferenceGroup { claims });
+                v.push(ReferenceGroup {
+                    claims,
+                    hash: reference_group.get("hash")?.as_str()?.to_string(),
+                });
             }
             v
         } else {
