@@ -2,7 +2,8 @@ use wikidata::*;
 
 #[test]
 fn simple_item() {
-    let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q106975887.json")).unwrap();
+    let j: serde_json::Value =
+        serde_json::from_str(include_str!("../items/Q106975887.json")).unwrap();
     Entity::from_json(j).unwrap();
 }
 
@@ -13,7 +14,6 @@ fn douglas_adams() {
 }
 
 #[test]
-#[ignore = "can't handle year right"]
 fn universe() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q1.json")).unwrap();
     Entity::from_json(j).unwrap();

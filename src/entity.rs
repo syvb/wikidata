@@ -398,7 +398,12 @@ impl Entity {
                                 .as_str()
                                 .ok_or(EntityError::NoRank)?,
                         )?,
-                        data: ClaimValueData::parse_snak(claim.get_mut("mainsnak").ok_or(EntityError::MissingMainsnak)?.take())?,
+                        data: ClaimValueData::parse_snak(
+                            claim
+                                .get_mut("mainsnak")
+                                .ok_or(EntityError::MissingMainsnak)?
+                                .take(),
+                        )?,
                         qualifiers,
                         references,
                     },
@@ -704,13 +709,18 @@ impl ClaimValueData {
                 lower_bound: parse_wb_number(&take_prop("lowerBound", &mut value)).ok(),
                 unit: try_get_as_qid(&take_prop("unit", &mut value)).ok(),
             }),
-            "time" => Ok(ClaimValueData::DateTime {
-                // our time parsing code can't handle a few edge cases (really old years), so we
-                // just give up on parsing the snak if parse_wb_time returns None
-                date_time: parse_wb_time(&get_json_string(take_prop("time", &mut value))?)?,
-                precision: parse_wb_number(&take_prop("precision", &mut value))
-                    .map_err(|_| EntityError::InvalidPrecision)? as u8,
-            }),
+            // our time parsing code can't handle a few edge cases (really old years), so we
+            "time" => Ok(
+                match parse_wb_time(&get_json_string(take_prop("time", &mut value))?) {
+                    Ok(date_time) => ClaimValueData::DateTime {
+                        date_time,
+                        precision: parse_wb_number(&take_prop("precision", &mut value))
+                            .map_err(|_| EntityError::InvalidPrecision)?
+                            as u8,
+                    },
+                    Err(_) => ClaimValueData::UnknownValue,
+                },
+            ),
             "monolingualtext" => Ok(ClaimValueData::MonolingualText(Text {
                 text: get_json_string(take_prop("text", &mut value))?,
                 lang: Lang(get_json_string(take_prop("language", &mut value))?),
