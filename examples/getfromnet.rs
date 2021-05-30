@@ -1,9 +1,11 @@
 use wikidata::*;
-use reqwest;
 
 fn main() {
     for i in 1_usize.. {
-        let uri = format!("https://www.wikidata.org/wiki/Special:EntityData/Q{}.json", i);
+        let uri = format!(
+            "https://www.wikidata.org/wiki/Special:EntityData/Q{}.json",
+            i
+        );
         let res = reqwest::blocking::get(uri).unwrap();
         let text = res.text().unwrap();
         if text.contains("<h1>Not Found</h1><p>No entity with ID ") {
