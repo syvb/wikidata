@@ -10,7 +10,8 @@ fn simple_item() {
 #[test]
 fn douglas_adams() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
-    Entity::from_json(j).unwrap();
+    let e = Entity::from_json(j).unwrap();
+    assert_eq!(e.id, WikiId::EntityId(Qid(42)));
 }
 
 #[test]

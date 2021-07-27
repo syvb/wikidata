@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid};
+use crate::ids::{consts, Fid, IdParseError, Lid, Pid, Qid, Sid};
 use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,8 @@ use serde_json::Value;
 /// A Wikibase entity: this could be an entity, property, or lexeme.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Entity {
+    ///Unique identifier
+    pub id: WikiId,
     /// All of the claims on the entity.
     pub claims: Vec<(Pid, ClaimValue)>,
     /// The type of the entity.
@@ -19,6 +21,17 @@ pub struct Entity {
     pub labels: BTreeMap<Lang, String>,
     /// Known aliases of the item
     pub aliases: BTreeMap<Lang, Vec<String>>,
+}
+
+/// Three main types of IDs entities can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WikiId {
+    /// A Qid
+    EntityId(Qid),
+    /// A Pid
+    PropertyId(Pid),
+    /// An Lid
+    LexemeId(Lid),
 }
 
 /// The type of entity: normal entity with a Qid, a property with a Pid, or a lexeme with a Lid.
@@ -238,6 +251,17 @@ impl Entity {
             None => json,
         };
 
+        let raw_id: &str = json
+            .get_mut("id")
+            .ok_or(EntityError::ExpectedObject)?
+            .as_str()
+            .ok_or(EntityError::ExpectedKeyvalTextString)?;
+
+        let id: WikiId = match get_wiki_id(raw_id) {
+            Ok(id) => id,
+            _ => return Err(EntityError::NoId),
+        };
+
         macro_rules! text_keyval {
             ($key:literal) => {{
                 match json.get($key) {
@@ -412,6 +436,7 @@ impl Entity {
         }
 
         Ok(Self {
+            id,
             claims,
             entity_type,
             descriptions,
@@ -419,6 +444,16 @@ impl Entity {
             aliases,
         })
     }
+}
+
+fn get_wiki_id(id: &str) -> Result<WikiId, IdParseError> {
+    let uid: WikiId = match &id[0..1] {
+        "Q" => WikiId::EntityId(Qid::from_str(id).unwrap()),
+        "P" => WikiId::PropertyId(Pid::from_str(id).unwrap()),
+        "L" => WikiId::LexemeId(Lid::from_str(id).unwrap()),
+        _ => return Err(IdParseError::InvalidPrefix),
+    };
+    Ok(uid)
 }
 
 /// An error related to entity parsing/creation.
@@ -850,6 +885,11 @@ mod test {
             &serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap(),
         );
         assert_eq!(qid, Ok(Qid(1234567)));
+    }
+
+    #[test]
+    fn get_wiki_id_test() {
+        assert_eq!(get_wiki_id("Q42").unwrap(), WikiId::EntityId(Qid(42)));
     }
 
     #[test]
