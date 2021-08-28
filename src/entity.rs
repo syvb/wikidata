@@ -19,18 +19,18 @@ pub struct Entity {
     pub descriptions: BTreeMap<Lang, String>,
     /// All of the labels in all known languages.
     pub labels: BTreeMap<Lang, String>,
-    /// Known aliases of the item
+    /// Known aliases of the item.
     pub aliases: BTreeMap<Lang, Vec<String>>,
 }
 
 /// Three main types of IDs entities can have.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WikiId {
-    /// A Qid
+    /// A Qid, representing an entity.
     EntityId(Qid),
-    /// A Pid
+    /// A Pid, representing a property.
     PropertyId(Pid),
-    /// An Lid
+    /// An Lid, representing a lexeme.
     LexemeId(Lid),
 }
 
@@ -59,7 +59,7 @@ pub enum ClaimValueData {
         lon: f64,
         /// How many degrees of distance of precision there are.
         precision: f64,
-        /// The globe the coordnaties are on, usually usually Q2 for Earth.
+        /// The globe the coordnaties are on, usually usually [Earth](consts::EARTH).
         globe: Qid,
     },
     /// A Wikidata item.
@@ -141,7 +141,8 @@ impl Default for ClaimValueData {
 /// A statement rank.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Rank {
-    /// The deprecated rank, indicating outdated/wrong info.
+    /// The deprecated rank, indicating outdated/wrong info. Deprecated claims should usually be
+    /// ignored.
     Deprecated,
     /// Normal rank, the default.
     Normal,
