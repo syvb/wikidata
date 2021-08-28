@@ -1,7 +1,7 @@
 //! Various ID types used by Wikidata.
 
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr};
+use std::{fmt, num::ParseIntError, str::FromStr};
 
 pub mod consts;
 
@@ -52,9 +52,9 @@ macro_rules! id_def {
                 }
             }
         }
-        impl std::fmt::Display for $name {
+        impl fmt::Display for $name {
             /// Display the ID as it would be in a URI.
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, concat!($letter, "{}"), self.0)
             }
         }
@@ -73,19 +73,17 @@ pub struct Fid(pub Lid, pub u16);
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Sid(pub Lid, pub u16);
 
-impl ToString for Fid {
+impl fmt::Display for Sid {
     /// Display the ID as it would be in a URI.
-    #[must_use]
-    fn to_string(&self) -> String {
-        format!("{}-F{}", self.0, self.1)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}-S{}", self.0, self.1)
     }
 }
 
-impl ToString for Sid {
+impl fmt::Display for Fid {
     /// Display the ID as it would be in a URI.
-    #[must_use]
-    fn to_string(&self) -> String {
-        format!("{}-S{}", self.0, self.1)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}-F{}", self.0, self.1)
     }
 }
 
@@ -112,19 +110,19 @@ pub mod test {
     #[test]
     fn to_string() {
         let entity = Qid(42);
-        assert_eq!(entity.to_string(), "Q42");
+        assert_eq!(format!("{}", entity), "Q42");
 
         let prop = Pid(6);
-        assert_eq!(prop.to_string(), "P6");
+        assert_eq!(format!("{}", prop), "P6");
 
         let lexeme = Lid(2);
-        assert_eq!(lexeme.to_string(), "L2");
+        assert_eq!(format!("{}", lexeme), "L2");
 
         let sense = Sid(Lid(5), 9);
-        assert_eq!(sense.to_string(), "L5-S9");
+        assert_eq!(format!("{}", sense), "L5-S9");
 
         let form = Fid(Lid(3), 11);
-        assert_eq!(form.to_string(), "L3-F11");
+        assert_eq!(format!("{}", form), "L3-F11");
     }
 
     #[test]
