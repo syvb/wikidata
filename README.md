@@ -1,6 +1,6 @@
 # `wikidata` - Rust bindings for Wikidata
 
-This crate has unofficial Rust bindings for Wikidata to make it easy to use data from Wikidata in Rust programs. This is very much a work in progress right now.
+This crate has unofficial Rust bindings for [Wikidata](https://www.wikidata.org/wiki/Wikidata:Main_Page) to make it easy to use data from Wikidata in Rust programs. This is very much a work in progress right now.
 
 
 ---
