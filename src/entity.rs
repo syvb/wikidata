@@ -376,7 +376,7 @@ impl Entity {
                                     .as_str()
                                     .ok_or(EntityError::ExpectedHashString)?
                                     .to_string(),
-                            })
+                            });
                         }
                         references
                     } else {
@@ -799,7 +799,7 @@ impl ClaimValue {
                         // clone, meh
                         let owned_snak = snak.clone().take();
                         if let Ok(x) = ClaimValueData::parse_snak(owned_snak) {
-                            claims.push((Pid(pid[1..].parse().ok()?), x))
+                            claims.push((Pid(pid[1..].parse().ok()?), x));
                         }
                     }
                 }
@@ -824,7 +824,7 @@ impl ClaimValue {
                 };
                 for claim in claim_array.drain(..) {
                     if let Ok(x) = ClaimValueData::parse_snak(claim) {
-                        v.push((Pid(pid[1..].parse().ok()?), x))
+                        v.push((Pid(pid[1..].parse().ok()?), x));
                     }
                 }
             }
