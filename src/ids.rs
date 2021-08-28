@@ -6,7 +6,7 @@ use std::{fmt, num::ParseIntError, str::FromStr};
 pub mod consts;
 
 /// An error parsing an ID.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdParseError {
     /// The number couldn't be parsed.
     UnparseableNumber(ParseIntError),
@@ -15,7 +15,7 @@ pub enum IdParseError {
 }
 
 macro_rules! id_def {
-    ($name:ident, $full_name:expr, $letter:expr) => {
+    ($name:ident, $full_name:expr, $letter:expr, $khar:expr) => {
         #[derive(
             Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
@@ -42,7 +42,7 @@ macro_rules! id_def {
 
             /// Parse the identifier from a string.
             fn from_str(x: &str) -> Result<Self, Self::Err> {
-                if x.is_empty() {
+                if x.chars().next() != Some($khar) {
                     return Err(IdParseError::InvalidPrefix);
                 }
                 let num_str = &x[1..];
@@ -61,9 +61,9 @@ macro_rules! id_def {
     };
 }
 
-id_def!(Qid, "entity ID", "Q");
-id_def!(Pid, "property ID", "P");
-id_def!(Lid, "lexeme ID", "L");
+id_def!(Qid, "entity ID", "Q", 'Q');
+id_def!(Pid, "property ID", "P", 'P');
+id_def!(Lid, "lexeme ID", "L", 'L');
 
 /// A lexeme ID and associated form ID
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -130,6 +130,8 @@ pub mod test {
         assert_eq!(Qid::from_str("Q42").unwrap(), Qid(42));
         assert_eq!(Lid::from_str("L944114").unwrap(), Lid(944114));
         assert_eq!(Pid::from_str("P1341").unwrap(), Pid(1341));
+        assert_eq!(Pid::from_str("Q1341"), Err(IdParseError::InvalidPrefix));
+        assert_eq!(Pid::from_str("1341"), Err(IdParseError::InvalidPrefix));
     }
 
     #[test]
