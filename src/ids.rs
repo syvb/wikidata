@@ -12,6 +12,24 @@ pub enum IdParseError {
     UnparseableNumber(ParseIntError),
     /// The ID had an invalid prefix letter.
     InvalidPrefix,
+    /// The ID had too many parts seperated by dashes
+    ///
+    /// ## Example
+    /// ```
+    /// use std::str::FromStr;
+    /// use wikidata::{Fid, IdParseError};
+    /// assert_eq!(Fid::from_str("L3-F2-S6"), Err(IdParseError::TooManyParts));
+    /// ```
+    TooManyParts,
+    /// The ID had too few parts seperated by dashes
+    ///
+    /// ## Example
+    /// ```
+    /// use std::str::FromStr;
+    /// use wikidata::{Fid, IdParseError};
+    /// assert_eq!(Fid::from_str("L3"), Err(IdParseError::TooFewParts));
+    /// ```
+    TooFewParts,
 }
 
 macro_rules! id_def {
@@ -69,13 +87,44 @@ macro_rules! lexeme_subid_def {
     ($name:ident, $full_name:expr, $letter:expr, $khar:expr) => {
         /// A lexeme ID and associated
         #[doc = $full_name]
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+        #[derive(
+            Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+        )]
         pub struct $name(pub Lid, pub u16);
 
         impl fmt::Display for $name {
             /// Display the ID as it would be in a URI.
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "{}-{}{}", self.0, $khar, self.1)
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = IdParseError;
+
+            /// Parse the identifier from a string.
+            fn from_str(x: &str) -> Result<Self, Self::Err> {
+                if x.chars().next() != Some('L') {
+                    return Err(IdParseError::InvalidPrefix);
+                }
+                let mut parts = x[1..].split('-');
+                let lid = parts
+                    .next()
+                    .ok_or(IdParseError::TooFewParts)?
+                    .parse()
+                    .map_err(IdParseError::UnparseableNumber)?;
+                let part2 = parts.next().ok_or(IdParseError::TooFewParts)?;
+                if part2.chars().next() != Some($khar) {
+                    return Err(IdParseError::InvalidPrefix);
+                }
+                let id = part2[1..]
+                    .parse()
+                    .map_err(IdParseError::UnparseableNumber)?;
+                if parts.next().is_some() {
+                    Err(IdParseError::TooManyParts)
+                } else {
+                    Ok(Self(Lid(lid), id))
+                }
             }
         }
     };
@@ -129,6 +178,14 @@ pub mod test {
         assert_eq!(Pid::from_str("P1341").unwrap(), Pid(1341));
         assert_eq!(Pid::from_str("Q1341"), Err(IdParseError::InvalidPrefix));
         assert_eq!(Pid::from_str("1341"), Err(IdParseError::InvalidPrefix));
+        assert!(Qid::from_str("Q").is_err());
+        assert_eq!(Sid::from_str("S1341"), Err(IdParseError::InvalidPrefix));
+        assert_eq!(Sid::from_str("L1341"), Err(IdParseError::TooFewParts));
+        assert_eq!(
+            Sid::from_str("L1341-A123"),
+            Err(IdParseError::InvalidPrefix)
+        );
+        assert_eq!(Sid::from_str("L1341-S123").unwrap(), Sid(Lid(1341), 123));
     }
 
     #[test]
