@@ -65,27 +65,24 @@ id_def!(Qid, "entity ID", "Q", 'Q');
 id_def!(Pid, "property ID", "P", 'P');
 id_def!(Lid, "lexeme ID", "L", 'L');
 
-/// A lexeme ID and associated form ID
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Fid(pub Lid, pub u16);
+macro_rules! lexeme_subid_def {
+    ($name:ident, $full_name:expr, $letter:expr, $khar:expr) => {
+        /// A lexeme ID and associated
+        #[doc = $full_name]
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+        pub struct $name(pub Lid, pub u16);
 
-/// A lexeme ID and assoicated sense ID
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Sid(pub Lid, pub u16);
-
-impl fmt::Display for Sid {
-    /// Display the ID as it would be in a URI.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-S{}", self.0, self.1)
-    }
+        impl fmt::Display for $name {
+            /// Display the ID as it would be in a URI.
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}-{}{}", self.0, $khar, self.1)
+            }
+        }
+    };
 }
 
-impl fmt::Display for Fid {
-    /// Display the ID as it would be in a URI.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-F{}", self.0, self.1)
-    }
-}
+lexeme_subid_def!(Fid, "form ID", "F", 'F');
+lexeme_subid_def!(Sid, "sense ID", "S", 'S');
 
 #[cfg(test)]
 pub mod test {
