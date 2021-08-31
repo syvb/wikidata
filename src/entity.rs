@@ -245,7 +245,12 @@ impl Entity {
                 let obj = ents.as_object_mut().ok_or(EntityError::ExpectedObject)?;
                 match obj.len() {
                     0 => return Err(EntityError::NoEntities),
-                    1 => obj.iter_mut().next().unwrap().1.take(),
+                    1 => obj
+                        .iter_mut()
+                        .next()
+                        .ok_or(EntityError::ExpectedObject)?
+                        .1
+                        .take(),
                     _ => return Err(EntityError::MultipleEntities),
                 }
             }
