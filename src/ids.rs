@@ -16,6 +16,20 @@ pub enum WikiId {
     LexemeId(Lid),
 }
 
+impl FromStr for WikiId {
+    type Err = IdParseError;
+
+    /// Parse the identifier from a string.
+    fn from_str(x: &str) -> Result<Self, Self::Err> {
+        match x.chars().next() {
+            Some('Q') => Qid::from_str(x).map(WikiId::EntityId),
+            Some('P') => Pid::from_str(x).map(WikiId::PropertyId),
+            Some('L') => Lid::from_str(x).map(WikiId::LexemeId),
+            _ => Err(IdParseError::InvalidPrefix),
+        }
+    }
+}
+
 /// An error parsing an ID.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdParseError {
@@ -199,6 +213,21 @@ pub mod test {
         assert_eq!(Sid::from_str("L1341-S123").unwrap(), Sid(Lid(1341), 123));
         assert!(Lid::from_str("L1341-S123").is_err());
         assert!(Lid::from_str("L1341-F123").is_err());
+        assert!(WikiId::from_str("L1341-F123").is_err());
+        assert!(WikiId::from_str("L1341-S123").is_err());
+        assert_eq!(WikiId::from_str("A123"), Err(IdParseError::InvalidPrefix));
+        assert_eq!(
+            WikiId::from_str("L1341").unwrap(),
+            WikiId::LexemeId(Lid(1341))
+        );
+        assert_eq!(
+            WikiId::from_str("Q1341").unwrap(),
+            WikiId::EntityId(Qid(1341))
+        );
+        assert_eq!(
+            WikiId::from_str("P1341").unwrap(),
+            WikiId::PropertyId(Pid(1341))
+        );
     }
 
     #[test]
