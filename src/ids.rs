@@ -5,6 +5,17 @@ use std::{fmt, num::ParseIntError, str::FromStr};
 
 pub mod consts;
 
+/// Three main types of IDs entities can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WikiId {
+    /// A Qid, representing an entity.
+    EntityId(Qid),
+    /// A Pid, representing a property.
+    PropertyId(Pid),
+    /// An Lid, representing a lexeme.
+    LexemeId(Lid),
+}
+
 /// An error parsing an ID.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdParseError {

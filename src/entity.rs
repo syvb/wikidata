@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::ids::{consts, Fid, IdParseError, Lid, Pid, Qid, Sid};
+use crate::ids::{consts, Fid, IdParseError, Lid, Pid, Qid, Sid, WikiId};
 use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use serde_json::Value;
 /// A Wikibase entity: this could be an entity, property, or lexeme.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Entity {
-    ///Unique identifier
+    /// Unique identifier
     pub id: WikiId,
     /// All of the claims on the entity.
     pub claims: Vec<(Pid, ClaimValue)>,
@@ -21,17 +21,6 @@ pub struct Entity {
     pub labels: BTreeMap<Lang, String>,
     /// Known aliases of the item.
     pub aliases: BTreeMap<Lang, Vec<String>>,
-}
-
-/// Three main types of IDs entities can have.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum WikiId {
-    /// A Qid, representing an entity.
-    EntityId(Qid),
-    /// A Pid, representing a property.
-    PropertyId(Pid),
-    /// An Lid, representing a lexeme.
-    LexemeId(Lid),
 }
 
 /// The type of entity: normal entity with a Qid, a property with a Pid, or a lexeme with a Lid.
