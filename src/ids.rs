@@ -197,6 +197,8 @@ pub mod test {
             Err(IdParseError::InvalidPrefix)
         );
         assert_eq!(Sid::from_str("L1341-S123").unwrap(), Sid(Lid(1341), 123));
+        assert!(Lid::from_str("L1341-S123").is_err());
+        assert!(Lid::from_str("L1341-F123").is_err());
     }
 
     #[test]
