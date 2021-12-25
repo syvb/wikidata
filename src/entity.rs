@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::ids::{consts, Fid, IdParseError, Lid, Pid, Qid, Sid, WikiId};
+use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid, WikiId};
 use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -252,7 +252,7 @@ impl Entity {
             .as_str()
             .ok_or(EntityError::ExpectedKeyvalTextString)?;
 
-        let id: WikiId = match get_wiki_id(raw_id) {
+        let id: WikiId = match WikiId::from_str(raw_id) {
             Ok(id) => id,
             _ => return Err(EntityError::NoId),
         };
@@ -439,16 +439,6 @@ impl Entity {
             aliases,
         })
     }
-}
-
-fn get_wiki_id(id: &str) -> Result<WikiId, IdParseError> {
-    let uid: WikiId = match &id[0..1] {
-        "Q" => WikiId::EntityId(Qid::from_str(id).unwrap()),
-        "P" => WikiId::PropertyId(Pid::from_str(id).unwrap()),
-        "L" => WikiId::LexemeId(Lid::from_str(id).unwrap()),
-        _ => return Err(IdParseError::InvalidPrefix),
-    };
-    Ok(uid)
 }
 
 /// An error related to entity parsing/creation.
@@ -880,11 +870,6 @@ mod test {
             &serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap(),
         );
         assert_eq!(qid, Ok(Qid(1234567)));
-    }
-
-    #[test]
-    fn get_wiki_id_test() {
-        assert_eq!(get_wiki_id("Q42").unwrap(), WikiId::EntityId(Qid(42)));
     }
 
     #[test]
