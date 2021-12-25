@@ -48,7 +48,7 @@ pub enum ClaimValueData {
         lon: f64,
         /// How many degrees of distance of precision there are.
         precision: f64,
-        /// The globe the coordnaties are on, usually usually [Earth](consts::EARTH).
+        /// The globe the coordnaties are on, usually [Earth](consts::EARTH).
         globe: Qid,
     },
     /// A Wikidata item.
