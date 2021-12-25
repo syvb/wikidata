@@ -6,6 +6,9 @@ edition = "2018"
 repository = "https://github.com/Smittyvb/wikidata/"
 license = "Apache-2.0"
 description = "A library for working with Wikidata in Rust"
+exclude = [
+    "items/"
+]
 
 [dependencies]
 chrono = { version = "0.4.19", features = ["std", "serde"], default-features = false }
