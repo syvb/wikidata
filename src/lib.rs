@@ -1,5 +1,11 @@
 //! Rust library for Wikidata. It has some support for Wikibase as well, although the main focus is
 //! supporting the Wikidata instance.
+//!
+//! ## A note on serialization
+//! Many items in this crate implement [`serde::Serialize`] and [`serde::Deserialize`]. Note that
+//! the JSON serialization of entities provided by these traits is not the same as the
+//! serialization used by Wikidata in data dumps and `Special:EntityData`, but is instead a
+//! serialization specific to this crate.
 
 #![warn(clippy::pedantic)]
 #![warn(missing_docs)]
