@@ -224,10 +224,13 @@ impl Entity {
         None
     }
 
-    /// Construct an entity from the Wikibase JSON repersentation.
+    /// Construct an entity from the Wikibase JSON repersentation. The input can either be an
+    /// object directly containing the Wikibase entity representation, or a multi-entity object
+    /// returned by some endpoints such as `Special:EntityData`. Multi-entity objects must only
+    /// contain one entity.
     ///
     /// # Errors
-    /// If the JSON reperesntation can't be parsed to an `Entity` an `EntityError` will be returned.
+    /// If the JSON reperesntation can't be parsed to an `Entity`, an `EntityError` will be returned.
     pub fn from_json(mut json: Value) -> Result<Self, EntityError> {
         let mut json = match json.get_mut("entities") {
             Some(ents) => {
