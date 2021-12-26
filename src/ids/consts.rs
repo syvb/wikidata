@@ -7,7 +7,7 @@ use super::*;
 macro_rules! qid_consts (
     { $($key:ident => $value:expr),+, } => {
         $(
-            #[allow(missing_docs)]
+            #[doc = concat!("Item [Q", $value, "](https://www.wikidata.org/wiki/Q", $value, ") on Wikidata")]
             pub const $key: crate::ids::Qid = crate::ids::Qid($value);
         )+
     };
@@ -15,7 +15,7 @@ macro_rules! qid_consts (
 macro_rules! pid_consts (
     { $($key:ident => $value:expr),+, } => {
         $(
-            #[allow(missing_docs)]
+            #[doc = concat!("Property [P", $value, "](https://www.wikidata.org/wiki/Property:P", $value, ") on Wikidata")]
             pub const $key: crate::ids::Pid = crate::ids::Pid($value);
         )+
     };
