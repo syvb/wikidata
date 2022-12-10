@@ -24,6 +24,8 @@ pub struct Entity {
 }
 
 /// The type of entity: normal entity with a Qid, a property with a Pid, or a lexeme with a Lid.
+///
+/// EntitySchemas (with E IDs) are currently unsupported.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum EntityType {

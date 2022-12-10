@@ -6,7 +6,10 @@ use std::{fmt, num::ParseIntError, str::FromStr};
 pub mod consts;
 
 /// Three main types of IDs entities can have.
+///
+/// EntitySchemas (with E IDs) are currently unsupported.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WikiId {
     /// A Qid, representing an entity.
     EntityId(Qid),
