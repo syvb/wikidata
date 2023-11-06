@@ -542,6 +542,8 @@ pub enum EntityError {
     ExpectedPidString,
     /// A mainsnak is missing
     MissingMainsnak,
+    /// An hour/minute/second is out of bounds.
+    OutOfBoundsTime,
 }
 
 fn get_json_string(json: Value) -> Result<String, EntityError> {
@@ -622,6 +624,7 @@ fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, En
         },
         None => None,
     };
+    #[allow(deprecated)] // TODO: avoid using ymd_opt here
     let maybe_date = Utc.ymd_opt(year, month.unwrap_or(1), day.unwrap_or(1));
     let date = match maybe_date {
         chrono::offset::LocalResult::Single(date) => date,
@@ -650,7 +653,9 @@ fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, En
     } else {
         (0, 0, 0)
     };
-    Ok(date.and_hms(hour, min, sec))
+    Ok(date
+        .and_hms_opt(hour, min, sec)
+        .ok_or(EntityError::OutOfBoundsTime)?)
 }
 
 impl ClaimValueData {
