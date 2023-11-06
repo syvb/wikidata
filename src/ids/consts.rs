@@ -23,8 +23,8 @@ macro_rules! pid_consts (
 
 macro_rules! qid_unit_suffixes {
     { $($key:ident => $value:expr),+, } => {
-        #[must_use]
         use super::*;
+        #[must_use]
         pub(crate) const fn unit_suffix(qid: Qid) -> Option<&'static str> {
             $(
                 if qid.0 == ($key).0 {
