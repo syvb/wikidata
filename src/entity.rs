@@ -21,6 +21,8 @@ pub struct Entity {
     pub labels: BTreeMap<Lang, String>,
     /// Known aliases of the item.
     pub aliases: BTreeMap<Lang, Vec<String>>,
+    /// site links (e.g. to wikipedia, wikivoyage, ...)
+    pub sitelinks: BTreeMap<SiteName, SitelinkValue>,
 }
 
 /// The type of entity: normal entity with a Qid, a property with a Pid, or a lexeme with a Lid.
@@ -184,6 +186,22 @@ pub struct ClaimValue {
     pub references: Vec<ReferenceGroup>,
 }
 
+
+/// A site name, as used in the sitelinks.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct SiteName(pub String);
+
+/// A sitelink value.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct SitelinkValue {
+    /// The title of the site link.
+    pub title: String,
+    /// The badges of the article.
+    pub badges: Vec<WikiId>,
+    /// The url of the article, if present
+    pub url: Option<String>,
+}
+
 impl Entity {
     /// All of the values of "instance of" on the entity.
     #[must_use]
@@ -319,6 +337,42 @@ impl Entity {
             None => BTreeMap::new(),
         };
 
+        let sitelinks = match json.get("sitelinks") {
+            Some(json_map) => {
+                let json_map = json_map.as_object().ok_or(EntityError::ExpectedObject)?;
+                let mut map = BTreeMap::new();
+                for (key, val) in json_map {
+                    let obj = val.as_object()
+                        .ok_or(EntityError::ExpectedObject)?;
+                    map.insert(
+                        SiteName(key.to_string()),
+                        SitelinkValue {
+                            title: obj.get("title")
+                                .ok_or(EntityError::ExpectedSiteTitleString)?
+                                .as_str()
+                                .ok_or(EntityError::ExpectedKeyvalTextString)?
+                                .to_string(),
+                            badges: obj.get("badges")
+                                .ok_or(EntityError::ExpectedSiteBadgesArray)?
+                                .as_array()
+                                .ok_or(EntityError::ExpectedSiteBadgesArray)?
+                                .iter()
+                                .filter_map(|val| {
+                                    let raw_id = val
+                                        .as_str()
+                                        .ok_or(EntityError::ExpectedKeyvalTextString).ok()?;
+                                    WikiId::from_str(raw_id).ok()
+                                })
+                                .collect(),
+                            url: obj.get("url").map(|val| val.to_string()),
+                        }
+                    );
+                }
+                map
+            }
+            None => BTreeMap::new(),
+        };
+
         let entity_type = match &json.get("type").ok_or(EntityError::NoEntityType)?.as_str() {
             Some("item") => EntityType::Entity,
             Some("property") => EntityType::Property,
@@ -442,6 +496,7 @@ impl Entity {
             descriptions,
             labels,
             aliases,
+            sitelinks,
         })
     }
 }
@@ -536,10 +591,14 @@ pub enum EntityError {
     ExpectedHashString,
     /// A string representing a language was expected but not found
     ExpectedLangString,
-    /// A string repersenting an alias was expected but not found
+    /// A string representing an alias was expected but not found
     ExpectedAliasString,
-    /// A string reperesnting a Pid was expected but not found
+    /// A string representing a Pid was expected but not found
     ExpectedPidString,
+    /// A string representing a site title was expected but not found
+    ExpectedSiteTitleString,
+    /// An array representing site badges was expected but not found
+    ExpectedSiteBadgesArray,
     /// A mainsnak is missing
     MissingMainsnak,
     /// An hour/minute/second is out of bounds.
