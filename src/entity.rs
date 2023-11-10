@@ -186,7 +186,6 @@ pub struct ClaimValue {
     pub references: Vec<ReferenceGroup>,
 }
 
-
 /// A site name, as used in the sitelinks.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SiteName(pub String);
@@ -342,17 +341,18 @@ impl Entity {
                 let json_map = json_map.as_object().ok_or(EntityError::ExpectedObject)?;
                 let mut map = BTreeMap::new();
                 for (key, val) in json_map {
-                    let obj = val.as_object()
-                        .ok_or(EntityError::ExpectedObject)?;
+                    let obj = val.as_object().ok_or(EntityError::ExpectedObject)?;
                     map.insert(
                         SiteName(key.to_string()),
                         SitelinkValue {
-                            title: obj.get("title")
+                            title: obj
+                                .get("title")
                                 .ok_or(EntityError::ExpectedSiteTitleString)?
                                 .as_str()
                                 .ok_or(EntityError::ExpectedKeyvalTextString)?
                                 .to_string(),
-                            badges: obj.get("badges")
+                            badges: obj
+                                .get("badges")
                                 .ok_or(EntityError::ExpectedSiteBadgesArray)?
                                 .as_array()
                                 .ok_or(EntityError::ExpectedSiteBadgesArray)?
@@ -360,12 +360,13 @@ impl Entity {
                                 .filter_map(|val| {
                                     let raw_id = val
                                         .as_str()
-                                        .ok_or(EntityError::ExpectedKeyvalTextString).ok()?;
+                                        .ok_or(EntityError::ExpectedKeyvalTextString)
+                                        .ok()?;
                                     Qid::from_str(raw_id).ok()
                                 })
                                 .collect(),
                             url: obj.get("url").map(|val| val.to_string()),
-                        }
+                        },
                     );
                 }
                 map
