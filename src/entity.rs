@@ -197,7 +197,7 @@ pub struct SitelinkValue {
     /// The title of the site link.
     pub title: String,
     /// The badges of the article.
-    pub badges: Vec<WikiId>,
+    pub badges: Vec<Qid>,
     /// The url of the article, if present
     pub url: Option<String>,
 }
@@ -361,7 +361,7 @@ impl Entity {
                                     let raw_id = val
                                         .as_str()
                                         .ok_or(EntityError::ExpectedKeyvalTextString).ok()?;
-                                    WikiId::from_str(raw_id).ok()
+                                    Qid::from_str(raw_id).ok()
                                 })
                                 .collect(),
                             url: obj.get("url").map(|val| val.to_string()),
