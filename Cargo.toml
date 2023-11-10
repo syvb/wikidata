@@ -1,9 +1,8 @@
 [package]
 name = "wikidata"
 version = "0.3.1"
-authors = ["Smitty <me@smitop.com>"]
 edition = "2018"
-repository = "https://github.com/Smittyvb/wikidata/"
+repository = "https://github.com/syvb/wikidata/"
 license = "Apache-2.0"
 description = "A library for working with Wikidata in Rust"
 exclude = [
