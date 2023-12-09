@@ -40,7 +40,7 @@ pub enum EntityType {
 }
 
 /// Data relating to a claim value.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub enum ClaimValueData {
     /// The ID of a file on Wikimedia Commons.
     CommonsMedia(String),
@@ -120,33 +120,23 @@ pub enum ClaimValueData {
     /// A sense ID on Wikidata.
     Sense(Sid),
     /// No value.
+    #[default]
     NoValue,
     /// Unknown value.
     UnknownValue,
 }
 
-impl Default for ClaimValueData {
-    fn default() -> Self {
-        ClaimValueData::NoValue
-    }
-}
-
 /// A statement rank.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 pub enum Rank {
     /// The deprecated rank, indicating outdated/wrong info. Deprecated claims should usually be
     /// ignored.
     Deprecated,
     /// Normal rank, the default.
+    #[default]
     Normal,
     /// Preferred rank, indicates the claim is most recent or accurate.
     Preferred,
-}
-
-impl Default for Rank {
-    fn default() -> Self {
-        Rank::Normal
-    }
 }
 
 impl FromStr for Rank {
