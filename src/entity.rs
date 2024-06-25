@@ -490,6 +490,47 @@ impl Entity {
             sitelinks,
         })
     }
+
+    /// Returns an iterator of references to all the claim values for a property ID.
+    ///
+    /// ## Example
+    /// ```
+    /// # let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// # let q42 = wikidata::Entity::from_json(j).unwrap();
+    /// for claim_value in q42.pid_claims(wikidata::Pid(69)) {
+    ///     if let wikidata::ClaimValueData::Item(value_qid) = claim_value.data {
+    ///         assert!(value_qid == wikidata::Qid(4961791) || value_qid == wikidata::Qid(691283));
+    ///     } else {
+    ///         panic!("Claim value data is not an item");
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn pid_claims(&self, pid: Pid) -> impl Iterator<Item = &ClaimValue> {
+        self.claims
+            .iter()
+            .filter(move |(claim_pid, _)| *claim_pid == pid)
+            .map(|(_, value)| value)
+    }
+
+    /// Find a claim by its ID.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// # let q42 = wikidata::Entity::from_json(j).unwrap();
+    /// let (pid, claim_value) = q42.claim_by_id("Q42$285E0C13-9674-4131-9556-51B316A57AEE").unwrap();
+    /// assert_eq!(pid, wikidata::Pid(1411));
+    /// assert_eq!(claim_value.rank, wikidata::Rank::Normal);
+    /// ```
+    #[must_use]
+    pub fn claim_by_id(&self, id: &str) -> Option<(Pid, &ClaimValue)> {
+        self.claims
+            .iter()
+            .find(|(_, value)| value.id == id)
+            .map(|(pid, value)| (*pid, value))
+    }
 }
 
 /// An error related to entity parsing/creation.
@@ -888,6 +929,50 @@ impl ClaimValue {
             references,
             qualifiers,
         })
+    }
+
+    #[must_use]
+    /// Returns an iterator of references to all the qualifer claim data for a property ID.
+    ///
+    /// ## Example
+    /// ```
+    /// # let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// # let q42 = wikidata::Entity::from_json(j).unwrap();
+    /// let claim = q42.claim_by_id("Q42$14ec162d-4a7c-3515-19ad-32b0e14fbb44").unwrap().1;
+    /// let media_legends = claim.qualifier_pid_claims(wikidata::Pid(2096));
+    /// assert_eq!(media_legends.count(), 5);
+    /// ```
+    pub fn qualifier_pid_claims(&self, pid: Pid) -> impl Iterator<Item = &ClaimValueData> {
+        self.qualifiers
+            .iter()
+            .filter(move |(claim_pid, _)| *claim_pid == pid)
+            .map(|(_, value)| value)
+    }
+}
+
+impl ReferenceGroup {
+    #[must_use]
+    /// Returns an iterator of references to all the claim data for a property ID.
+    ///
+    /// ## Example
+    /// ```
+    /// # let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// # let q42 = wikidata::Entity::from_json(j).unwrap();
+    /// let group = &q42.claim_by_id("q42$881F40DC-0AFE-4FEB-B882-79600D234273").unwrap().1.references[0];
+    /// let mut claims = group.pid_claims(wikidata::Pid(854));
+    /// if let Some(wikidata::ClaimValueData::Url(url)) = claims.next() {
+    ///     assert_eq!(url, "http://highgatecemetery.org/visit/who");
+    /// } else {
+    ///     panic!("Expected a URL");
+    /// };
+    /// assert_eq!(claims.next(), None);
+    /// ```
+
+    pub fn pid_claims(&self, pid: Pid) -> impl Iterator<Item = &ClaimValueData> {
+        self.claims
+            .iter()
+            .filter(move |(claim_pid, _)| *claim_pid == pid)
+            .map(|(_, value)| value)
     }
 }
 
