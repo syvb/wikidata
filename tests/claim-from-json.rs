@@ -7,13 +7,13 @@ fn id_snak() {
     let j: serde_json::Value =
         serde_json::from_str(include_str!("../items/Q106975887.json")).unwrap();
     let snak = &j["entities"]["Q106975887"]["claims"]["P31"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(data, ClaimValueData::Item(Qid(5)));
 
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q1.json")).unwrap();
     let snak = &j["entities"]["Q1"]["claims"]["P793"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(data, ClaimValueData::Item(Qid(323)));
 }
@@ -22,7 +22,7 @@ fn id_snak() {
 fn commons_snak() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
     let snak = &j["entities"]["Q42"]["claims"]["P18"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(
         data,
@@ -34,7 +34,7 @@ fn commons_snak() {
 fn quantity_snak() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
     let snak = &j["entities"]["Q42"]["claims"]["P2048"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(
         data,
@@ -51,7 +51,8 @@ fn quantity_snak() {
 fn external_id_snak() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
     let snak = &j["entities"]["Q42"]["claims"]["P213"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
+
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(
         data,
@@ -63,7 +64,7 @@ fn external_id_snak() {
 fn coordinates_snak() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q513.json")).unwrap();
     let snak = &j["entities"]["Q513"]["claims"]["P625"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(
         data,
@@ -80,7 +81,7 @@ fn coordinates_snak() {
 fn mono_text_snak() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
     let snak = &j["entities"]["Q42"]["claims"]["P1477"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(
         data,
@@ -95,10 +96,10 @@ fn mono_text_snak() {
 fn date_snak() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
     let snak = &j["entities"]["Q42"]["claims"]["P569"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println! {"{snak:?}"};
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(
-        &format!("{:?}", data),
+        &format!("{data:?}"),
         "DateTime { date_time: 1952-03-11T00:00:00Z, precision: 11 }",
     );
 }
@@ -107,7 +108,7 @@ fn date_snak() {
 fn lexeme_snak() {
     let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q31928.json")).unwrap();
     let snak = &j["entities"]["Q31928"]["claims"]["P6254"][0]["mainsnak"];
-    println!("{:?}", snak);
+    println!("{snak:?}");
     let data = ClaimValueData::parse_snak(snak.clone()).unwrap();
     assert_eq!(data, ClaimValueData::Lexeme(Lid(361)));
 }
