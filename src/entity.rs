@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid, WikiId};
+use crate::ids::{Fid, Lid, Pid, Qid, Sid, WikiId, consts};
 use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -197,10 +197,10 @@ impl Entity {
     pub fn instances(&self) -> Vec<Qid> {
         let mut instances = Vec::with_capacity(1);
         for (pid, claim) in &self.claims {
-            if *pid == consts::INSTANCE_OF {
-                if let ClaimValueData::Item(qid) = claim.data {
-                    instances.push(qid);
-                }
+            if *pid == consts::INSTANCE_OF
+                && let ClaimValueData::Item(qid) = claim.data
+            {
+                instances.push(qid);
             }
         }
         instances.shrink_to_fit();
@@ -211,10 +211,10 @@ impl Entity {
     #[must_use]
     pub fn start_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
-            if *pid == consts::DATE_OF_BIRTH {
-                if let ClaimValueData::DateTime { date_time, .. } = claim.data {
-                    return Some(date_time);
-                }
+            if *pid == consts::DATE_OF_BIRTH
+                && let ClaimValueData::DateTime { date_time, .. } = claim.data
+            {
+                return Some(date_time);
             }
         }
         None
@@ -224,10 +224,10 @@ impl Entity {
     #[must_use]
     pub fn end_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
-            if *pid == consts::DATE_OF_DEATH {
-                if let ClaimValueData::DateTime { date_time, .. } = claim.data {
-                    return Some(date_time);
-                }
+            if *pid == consts::DATE_OF_DEATH
+                && let ClaimValueData::DateTime { date_time, .. } = claim.data
+            {
+                return Some(date_time);
             }
         }
         None
