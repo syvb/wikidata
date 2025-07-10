@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::ids::{consts, Fid, Lid, Pid, Qid, Sid, WikiId};
+use crate::ids::{Fid, Lid, Pid, Qid, Sid, WikiId, consts};
 use crate::text::{Lang, Text};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub struct Entity {
 
 /// The type of entity: normal entity with a Qid, a property with a Pid, or a lexeme with a Lid.
 ///
-/// EntitySchemas (with E IDs) are currently unsupported.
+/// `EntitySchemas` (with E IDs) are currently unsupported.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum EntityType {
@@ -80,7 +80,7 @@ pub enum ClaimValueData {
     },
     /// A point in time time.
     DateTime {
-        /// The time as a Chrono DateTime.
+        /// The time as a Chrono `DateTime`.
         date_time: DateTime<chrono::offset::Utc>,
         /// The precision of the date:
         ///
@@ -109,7 +109,7 @@ pub enum ClaimValueData {
     MathExpr(String),
     /// A geometric shape. The value of the string is currently unspecified.
     GeoShape(String),
-    /// LilyPond musical notation.
+    /// `LilyPond` musical notation.
     MusicNotation(String),
     /// ID of a file with tabular data on Wikimedia commons.
     TabularData(String),
@@ -197,11 +197,11 @@ impl Entity {
     pub fn instances(&self) -> Vec<Qid> {
         let mut instances = Vec::with_capacity(1);
         for (pid, claim) in &self.claims {
-            if *pid == consts::INSTANCE_OF {
-                if let ClaimValueData::Item(qid) = claim.data {
-                    instances.push(qid);
-                };
-            };
+            if *pid == consts::INSTANCE_OF
+                && let ClaimValueData::Item(qid) = claim.data
+            {
+                instances.push(qid);
+            }
         }
         instances.shrink_to_fit();
         instances
@@ -211,11 +211,11 @@ impl Entity {
     #[must_use]
     pub fn start_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
-            if *pid == consts::DATE_OF_BIRTH {
-                if let ClaimValueData::DateTime { date_time, .. } = claim.data {
-                    return Some(date_time);
-                };
-            };
+            if *pid == consts::DATE_OF_BIRTH
+                && let ClaimValueData::DateTime { date_time, .. } = claim.data
+            {
+                return Some(date_time);
+            }
         }
         None
     }
@@ -224,11 +224,11 @@ impl Entity {
     #[must_use]
     pub fn end_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
-            if *pid == consts::DATE_OF_DEATH {
-                if let ClaimValueData::DateTime { date_time, .. } = claim.data {
-                    return Some(date_time);
-                };
-            };
+            if *pid == consts::DATE_OF_DEATH
+                && let ClaimValueData::DateTime { date_time, .. } = claim.data
+            {
+                return Some(date_time);
+            }
         }
         None
     }
@@ -355,7 +355,7 @@ impl Entity {
                                     Qid::from_str(raw_id).ok()
                                 })
                                 .collect(),
-                            url: obj.get("url").map(|val| val.to_string()),
+                            url: obj.get("url").map(std::string::ToString::to_string),
                         },
                     );
                 }
@@ -505,7 +505,6 @@ impl Entity {
     ///     }
     /// }
     /// ```
-    #[must_use]
     pub fn pid_claims(&self, pid: Pid) -> impl Iterator<Item = &ClaimValue> {
         self.claims
             .iter()
@@ -637,7 +636,7 @@ pub enum EntityError {
     OutOfBoundsTime,
 }
 
-fn get_json_string(json: Value) -> Result<String, EntityError> {
+fn get_json_string(json: &Value) -> Result<String, EntityError> {
     json.as_str()
         .map(ToString::to_string)
         .ok_or(EntityError::ExpectedString)
@@ -724,29 +723,27 @@ fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, En
     };
     let (hour, min, sec) = if time_parts.len() == 2 {
         let colon_parts: Vec<&str> = time_parts[1].split(':').collect();
-        let hour = match colon_parts.get(0).ok_or(EntityError::MissingHour)?.parse() {
-            Ok(x) => x,
-            Err(_) => return Err(EntityError::FloatParse),
+        let Ok(hour) = colon_parts.first().ok_or(EntityError::MissingHour)?.parse() else {
+            return Err(EntityError::FloatParse);
         };
-        let minute = match colon_parts
+
+        let Ok(minute) = colon_parts
             .get(1)
             .ok_or(EntityError::MissingMinute)?
             .parse()
-        {
-            Ok(x) => x,
-            Err(_) => return Err(EntityError::FloatParse),
+        else {
+            return Err(EntityError::FloatParse);
         };
-        let sec = match colon_parts.get(2).ok_or(EntityError::MissingSecond)?[0..2].parse() {
-            Ok(x) => x,
-            Err(_) => return Err(EntityError::FloatParse),
+
+        let Ok(sec) = colon_parts.get(2).ok_or(EntityError::MissingSecond)?[0..2].parse() else {
+            return Err(EntityError::FloatParse);
         };
         (hour, minute, sec)
     } else {
         (0, 0, 0)
     };
-    Ok(date
-        .and_hms_opt(hour, min, sec)
-        .ok_or(EntityError::OutOfBoundsTime)?)
+    date.and_hms_opt(hour, min, sec)
+        .ok_or(EntityError::OutOfBoundsTime)
 }
 
 impl ClaimValueData {
@@ -756,14 +753,14 @@ impl ClaimValueData {
     /// If the `snak` does not correspond to a valid snak, then an error will be returned.
     pub fn parse_snak(mut snak: Value) -> Result<Self, EntityError> {
         let mut datavalue: Value = take_prop("datavalue", &mut snak);
-        let datatype: &str = &get_json_string(take_prop("datatype", &mut snak))?;
-        let snaktype: &str = &get_json_string(take_prop("snaktype", &mut snak))?;
+        let datatype: &str = &get_json_string(&take_prop("datatype", &mut snak))?;
+        let snaktype: &str = &get_json_string(&take_prop("snaktype", &mut snak))?;
         match snaktype {
             "value" => {}
             "somevalue" => return Ok(ClaimValueData::UnknownValue),
             "novalue" => return Ok(ClaimValueData::NoValue),
             _ => return Err(EntityError::InvalidSnaktype),
-        };
+        }
         let type_str = take_prop("type", &mut datavalue)
             .as_str()
             .ok_or(EntityError::InvalidSnaktype)?
@@ -789,7 +786,7 @@ impl ClaimValueData {
             }
             "wikibase-entityid" => {
                 // the ID could be a entity, lexeme, property, form, or sense
-                let id = get_json_string(take_prop("id", &mut value))?;
+                let id = get_json_string(&take_prop("id", &mut value))?;
                 match id.chars().next().ok_or(EntityError::BadId)? {
                     'Q' => Ok(ClaimValueData::Item(Qid(id[1..]
                         .parse()
@@ -841,7 +838,7 @@ impl ClaimValueData {
             }),
             // our time parsing code can't handle a few edge cases (really old years), so we
             "time" => Ok(
-                match parse_wb_time(&get_json_string(take_prop("time", &mut value))?) {
+                match parse_wb_time(&get_json_string(&take_prop("time", &mut value))?) {
                     Ok(date_time) => ClaimValueData::DateTime {
                         date_time,
                         precision: parse_wb_number(&take_prop("precision", &mut value))
@@ -852,8 +849,8 @@ impl ClaimValueData {
                 },
             ),
             "monolingualtext" => Ok(ClaimValueData::MonolingualText(Text {
-                text: get_json_string(take_prop("text", &mut value))?,
-                lang: Lang(get_json_string(take_prop("language", &mut value))?),
+                text: get_json_string(&take_prop("text", &mut value))?,
+                lang: Lang(get_json_string(&take_prop("language", &mut value))?),
             })),
             _ => Err(EntityError::UnknownDatatype),
         }
@@ -880,8 +877,8 @@ impl ClaimValue {
                 let reference_group = reference_group.as_object()?;
                 let mut claims = Vec::with_capacity(reference_group["snaks"].as_array()?.len());
                 let snaks = reference_group["snaks"].as_object()?;
-                for (pid, snak_group) in snaks.iter() {
-                    for snak in snak_group.as_array()?.iter() {
+                for (pid, snak_group) in snaks {
+                    for snak in snak_group.as_array()? {
                         // clone, meh
                         let owned_snak = snak.clone().take();
                         if let Ok(x) = ClaimValueData::parse_snak(owned_snak) {
@@ -901,11 +898,9 @@ impl ClaimValue {
         let qualifiers_json = take_prop("qualifiers", &mut claim);
         let qualifiers = if qualifiers_json.is_object() {
             let mut v: Vec<(Pid, ClaimValueData)> = vec![];
-            for (pid, claim_array_json) in qualifiers_json.as_object()?.iter() {
+            for (pid, claim_array_json) in qualifiers_json.as_object()? {
                 // yep it's a clone, meh
-                let mut claim_array = if let Value::Array(x) = claim_array_json.clone().take() {
-                    x
-                } else {
+                let Value::Array(mut claim_array) = claim_array_json.clone().take() else {
                     return None;
                 };
                 for claim in claim_array.drain(..) {
@@ -931,7 +926,6 @@ impl ClaimValue {
         })
     }
 
-    #[must_use]
     /// Returns an iterator of references to all the qualifer claim data for a property ID.
     ///
     /// ## Example
@@ -951,7 +945,6 @@ impl ClaimValue {
 }
 
 impl ReferenceGroup {
-    #[must_use]
     /// Returns an iterator of references to all the claim data for a property ID.
     ///
     /// ## Example
@@ -967,7 +960,6 @@ impl ReferenceGroup {
     /// };
     /// assert_eq!(claims.next(), None);
     /// ```
-
     pub fn pid_claims(&self, pid: Pid) -> impl Iterator<Item = &ClaimValueData> {
         self.claims
             .iter()
@@ -998,10 +990,10 @@ mod test {
             // "-410000000-00-00T00:00:00Z",
         ];
         for time in valid_times {
-            println!("Trying \"{}\"", time);
+            println!("Trying \"{time}\"");
             assert!(match parse_wb_time(time) {
                 Ok(val) => {
-                    println!("Got {:#?}", val);
+                    println!("Got {val:#?}");
                     true
                 }
                 Err(_) => false,
@@ -1014,7 +1006,7 @@ mod test {
         let qid = try_get_as_qid(
             &serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap(),
         );
-        assert_eq!(qid, Ok(Qid(1234567)));
+        assert_eq!(qid, Ok(Qid(1_234_567)));
     }
 
     #[test]

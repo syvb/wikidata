@@ -7,7 +7,7 @@ pub mod consts;
 
 /// Three main types of IDs entities can have.
 ///
-/// EntitySchemas (with E IDs) are currently unsupported.
+/// `EntitySchemas` (with E IDs) are currently unsupported.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum WikiId {
@@ -162,6 +162,7 @@ lexeme_subid_def!(Fid, "form ID", "F", 'F');
 lexeme_subid_def!(Sid, "sense ID", "S", 'S');
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test {
     use super::*;
 
@@ -178,31 +179,31 @@ pub mod test {
         assert_eq!(
             Lid(1).json_url(),
             "https://www.wikidata.org/wiki/Special:EntityData/L1.json"
-        )
+        );
     }
 
     #[test]
     fn to_string() {
         let entity = Qid(42);
-        assert_eq!(format!("{}", entity), "Q42");
+        assert_eq!(format!("{entity}"), "Q42");
 
         let prop = Pid(6);
-        assert_eq!(format!("{}", prop), "P6");
+        assert_eq!(format!("{prop}"), "P6");
 
         let lexeme = Lid(2);
-        assert_eq!(format!("{}", lexeme), "L2");
+        assert_eq!(format!("{lexeme}"), "L2");
 
         let sense = Sid(Lid(5), 9);
-        assert_eq!(format!("{}", sense), "L5-S9");
+        assert_eq!(format!("{sense}"), "L5-S9");
 
         let form = Fid(Lid(3), 11);
-        assert_eq!(format!("{}", form), "L3-F11");
+        assert_eq!(format!("{form}"), "L3-F11");
     }
 
     #[test]
     fn from_str() {
         assert_eq!(Qid::from_str("Q42").unwrap(), Qid(42));
-        assert_eq!(Lid::from_str("L944114").unwrap(), Lid(944114));
+        assert_eq!(Lid::from_str("L944114").unwrap(), Lid(944_114));
         assert_eq!(Pid::from_str("P1341").unwrap(), Pid(1341));
         assert_eq!(Pid::from_str("Q1341"), Err(IdParseError::InvalidPrefix));
         assert_eq!(Pid::from_str("1341"), Err(IdParseError::InvalidPrefix));

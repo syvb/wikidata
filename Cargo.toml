@@ -1,19 +1,19 @@
 [package]
 name = "wikidata"
 version = "1.1.0"
-edition = "2018"
+edition = "2024"
 repository = "https://github.com/syvb/wikidata/"
 license = "Apache-2.0"
 description = "A library for working with Wikidata in Rust"
-exclude = [
-    "items/"
-]
+exclude = ["items/"]
 
 [dependencies]
-chrono = { version = "0.4.31", features = ["std", "serde"], default-features = false }
-serde = { version = "1.0.126", features = ["derive"] }
+chrono = { version = "0.4.31", features = [
+    "std",
+    "serde",
+], default-features = false }
+serde = { version = "1.0.216", features = ["derive"] }
 serde_json = "1.0.64"
-lazy_static = "1.4.0"
 
 [dev-dependencies]
-reqwest = { version = "0.11", features = ["blocking"] }
+reqwest = { version = "0.12", features = ["blocking"] }
