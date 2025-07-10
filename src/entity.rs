@@ -255,7 +255,7 @@ impl Entity {
                     _ => return Err(EntityError::MultipleEntities),
                 }
             }
-            _ => json,
+            None => json,
         };
 
         let raw_id: &str = json
@@ -289,7 +289,7 @@ impl Entity {
                         }
                         map
                     }
-                    _ => BTreeMap::new(),
+                    None => BTreeMap::new(),
                 }
             }};
         }
@@ -323,7 +323,7 @@ impl Entity {
                 }
                 map
             }
-            _ => BTreeMap::new(),
+            None => BTreeMap::new(),
         };
 
         let sitelinks = match json.get("sitelinks") {
@@ -361,7 +361,7 @@ impl Entity {
                 }
                 map
             }
-            _ => BTreeMap::new(),
+            None => BTreeMap::new(),
         };
 
         let entity_type = match &json.get("type").ok_or(EntityError::NoEntityType)?.as_str() {
@@ -678,7 +678,7 @@ fn try_get_as_qid(datavalue: &Value) -> Result<Qid, EntityError> {
 fn take_prop(key: &'static str, claim: &mut Value) -> Value {
     match claim.as_object_mut() {
         Some(obj) => obj.remove(key).unwrap_or(Value::Null),
-        _ => Value::Null,
+        None => Value::Null,
     }
 }
 
@@ -705,14 +705,14 @@ fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, En
             Ok(0) | Err(_) => None,
             Ok(x) => Some(x),
         },
-        _ => None,
+        None => None,
     };
     let day: Option<u32> = match dash_parts.get(2) {
         Some(day_str) => match day_str.parse() {
             Ok(0) | Err(_) => None,
             Ok(x) => Some(x),
         },
-        _ => None,
+        None => None,
     };
     #[allow(deprecated)] // TODO: avoid using ymd_opt here
     let maybe_date = Utc.ymd_opt(year, month.unwrap_or(1), day.unwrap_or(1));
