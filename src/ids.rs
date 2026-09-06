@@ -23,6 +23,17 @@ impl FromStr for WikiId {
     type Err = IdParseError;
 
     /// Parse the identifier from a string.
+    ///
+    /// ## Example
+    /// ```
+    /// use std::str::FromStr;
+    /// use wikidata::{IdParseError, Lid, Qid, WikiId};
+    /// assert_eq!(WikiId::from_str("Q42"), Ok(WikiId::EntityId(Qid(42))));
+    /// assert_eq!(WikiId::from_str("L361"), Ok(WikiId::LexemeId(Lid(361))));
+    /// // forms and senses are not entities, and so are not `WikiId`s
+    /// assert!(WikiId::from_str("L361-F1").is_err());
+    /// assert_eq!(WikiId::from_str("42"), Err(IdParseError::InvalidPrefix));
+    /// ```
     fn from_str(x: &str) -> Result<Self, Self::Err> {
         match x.chars().next() {
             Some('Q') => Qid::from_str(x).map(WikiId::EntityId),
@@ -71,6 +82,18 @@ macro_rules! id_def {
 
         impl $name {
             /// Get the URL to access data about the claim on Wikidata.
+            ///
+            /// ## Example
+            /// ```
+            #[doc = concat!("use wikidata::", stringify!($name), ";")]
+            #[doc = concat!(
+                        "assert_eq!(",
+                        stringify!($name),
+                        "(42).json_url(), \"https://www.wikidata.org/wiki/Special:EntityData/",
+                        $letter,
+                        "42.json\");"
+                    )]
+            /// ```
             #[must_use]
             pub fn json_url(&self) -> String {
                 format!(

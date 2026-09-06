@@ -193,6 +193,14 @@ pub struct SitelinkValue {
 
 impl Entity {
     /// All of the values of "instance of" on the entity.
+    ///
+    /// ## Example
+    /// ```
+    /// # let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// # let q42 = wikidata::Entity::from_json(j).unwrap();
+    /// // Douglas Adams is an instance of Q5, "human"
+    /// assert_eq!(q42.instances(), vec![wikidata::consts::HUMAN]);
+    /// ```
     #[must_use]
     pub fn instances(&self) -> Vec<Qid> {
         let mut instances = Vec::with_capacity(1);
@@ -208,6 +216,19 @@ impl Entity {
     }
 
     /// When the entity started existing.
+    ///
+    /// This is the entity's date of birth ([`P569`](consts::DATE_OF_BIRTH)); entities that use
+    /// another property for this, such as inception or start time, return `None`.
+    ///
+    /// ## Example
+    /// ```
+    /// # let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// # let q42 = wikidata::Entity::from_json(j).unwrap();
+    /// assert_eq!(
+    ///     q42.start_time().map(|t| t.to_string()),
+    ///     Some("1952-03-11 00:00:00 UTC".to_string()),
+    /// );
+    /// ```
     #[must_use]
     pub fn start_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
@@ -221,6 +242,19 @@ impl Entity {
     }
 
     /// When the entity stopped existing.
+    ///
+    /// This is the entity's date of death ([`P570`](consts::DATE_OF_DEATH)); entities that use
+    /// another property for this, such as dissolution or end time, return `None`.
+    ///
+    /// ## Example
+    /// ```
+    /// # let j: serde_json::Value = serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// # let q42 = wikidata::Entity::from_json(j).unwrap();
+    /// assert_eq!(
+    ///     q42.end_time().map(|t| t.to_string()),
+    ///     Some("2001-05-11 00:00:00 UTC".to_string()),
+    /// );
+    /// ```
     #[must_use]
     pub fn end_time(&self) -> Option<DateTime<chrono::offset::Utc>> {
         for (pid, claim) in &self.claims {
@@ -237,6 +271,17 @@ impl Entity {
     /// object directly containing the Wikibase entity representation, or a multi-entity object
     /// returned by some endpoints such as `Special:EntityData`. Multi-entity objects must only
     /// contain one entity.
+    ///
+    /// ## Example
+    /// ```
+    /// use wikidata::{Entity, EntityType, Lang, Qid, WikiId};
+    /// let json: serde_json::Value =
+    ///     serde_json::from_str(include_str!("../items/Q42.json")).unwrap();
+    /// let q42 = Entity::from_json(json).unwrap();
+    /// assert_eq!(q42.id, WikiId::EntityId(Qid(42)));
+    /// assert_eq!(q42.entity_type, EntityType::Entity);
+    /// assert_eq!(q42.labels[&Lang("en".to_string())], "Douglas Adams");
+    /// ```
     ///
     /// # Errors
     /// If the JSON reperesntation can't be parsed to an `Entity`, an `EntityError` will be returned.
@@ -749,6 +794,22 @@ fn parse_wb_time(time: &str) -> Result<chrono::DateTime<chrono::offset::Utc>, En
 impl ClaimValueData {
     /// Parses a snak.
     ///
+    /// ## Example
+    /// ```
+    /// use wikidata::{ClaimValueData, Qid};
+    /// let snak = serde_json::json!({
+    ///     "snaktype": "value",
+    ///     "property": "P31",
+    ///     "datatype": "wikibase-item",
+    ///     "datavalue": { "type": "wikibase-entityid", "value": { "id": "Q5" } },
+    /// });
+    /// assert_eq!(ClaimValueData::parse_snak(snak), Ok(ClaimValueData::Item(Qid(5))));
+    ///
+    /// // snaks can also state that there is no value, or that the value is unknown
+    /// let snak = serde_json::json!({ "snaktype": "novalue", "datatype": "wikibase-item" });
+    /// assert_eq!(ClaimValueData::parse_snak(snak), Ok(ClaimValueData::NoValue));
+    /// ```
+    ///
     /// # Errors
     /// If the `snak` does not correspond to a valid snak, then an error will be returned.
     pub fn parse_snak(mut snak: Value) -> Result<Self, EntityError> {
@@ -971,53 +1032,212 @@ impl ReferenceGroup {
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde_json::json;
+
+    fn utc(y: i32, mo: u32, d: u32, h: u32, mi: u32, se: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(y, mo, d, h, mi, se).unwrap()
+    }
+
+    // -----------------------------------------------------------------------
+    // parse_wb_time
+    // -----------------------------------------------------------------------
 
     #[test]
     fn time_parsing() {
-        let valid_times = vec![
-            "+2001-12-31T00:00:00Z",
-            "+12346-12-31T00:00:00Z",
-            "+311-12-31T00:00:00Z",
-            "+1979-00-00T00:00:00Z",
-            "-1979-00-00T00:00:00Z",
-            "+2001-12-31T00:00:00Z",
-            "+2001-12-31",
-            "+2001-12",
-            "-12561",
-            "+311-12-31T12:34:56Z",
-            "+311-12-31T23:45:42Z",
-            // below are times that *should* work, but chrono doesn't accept
-            // "-410000000-00-00T00:00:00Z",
+        let cases = [
+            ("+2001-12-31T00:00:00Z", utc(2001, 12, 31, 0, 0, 0)),
+            ("+311-12-31T12:34:56Z", utc(311, 12, 31, 12, 34, 56)),
+            ("+311-12-31T23:45:42Z", utc(311, 12, 31, 23, 45, 42)),
+            ("+12346-12-31T00:00:00Z", utc(12346, 12, 31, 0, 0, 0)),
+            // fractional seconds are truncated, not rejected
+            ("+2001-12-31T12:34:56.789Z", utc(2001, 12, 31, 12, 34, 56)),
+            // a zero month or day means "unknown", and falls back to the first
+            ("+1979-00-00T00:00:00Z", utc(1979, 1, 1, 0, 0, 0)),
+            ("-1979-00-00T00:00:00Z", utc(-1979, 1, 1, 0, 0, 0)),
+            // less precise times simply leave parts off
+            ("+2001-12-31", utc(2001, 12, 31, 0, 0, 0)),
+            ("+2001-12", utc(2001, 12, 1, 0, 0, 0)),
+            ("+2001", utc(2001, 1, 1, 0, 0, 0)),
+            ("-12561", utc(-12561, 1, 1, 0, 0, 0)),
+            ("+0000-01-01T00:00:00Z", utc(0, 1, 1, 0, 0, 0)),
+            // leap days in leap years are fine
+            ("+2000-02-29T00:00:00Z", utc(2000, 2, 29, 0, 0, 0)),
         ];
-        for time in valid_times {
-            println!("Trying \"{time}\"");
-            assert!(match parse_wb_time(time) {
-                Ok(val) => {
-                    println!("Got {val:#?}");
-                    true
-                }
-                Err(_) => false,
-            });
+        for (raw, expected) in cases {
+            assert_eq!(parse_wb_time(raw), Ok(expected), "parsing {raw:?}");
         }
     }
 
     #[test]
-    fn as_qid_test() {
-        let qid = try_get_as_qid(
-            &serde_json::from_str(r#""http://www.wikidata.org/entity/Q1234567""#).unwrap(),
-        );
-        assert_eq!(qid, Ok(Qid(1_234_567)));
+    fn time_parsing_is_lenient_about_unparseable_months_and_days() {
+        // a month or day that is not a number is treated as absent
+        assert_eq!(parse_wb_time("+2001-xx-yy"), Ok(utc(2001, 1, 1, 0, 0, 0)));
     }
 
     #[test]
+    fn time_parsing_errors() {
+        let cases = [
+            ("", EntityError::TimeEmpty),
+            ("+", EntityError::NoDateYear),
+            ("+abcd", EntityError::NoDateYear),
+            // the year has to fit in an i32, which rules out geological timescales
+            ("-13798000000-00-00T00:00:00Z", EntityError::NoDateYear),
+            // 1900 was not a leap year
+            ("+1900-02-29T00:00:00Z", EntityError::NoDateMatched),
+            ("+2001-13-01T00:00:00Z", EntityError::NoDateMatched),
+            ("+2001-12-32T00:00:00Z", EntityError::NoDateMatched),
+            ("+2001-12-31T25:00:00Z", EntityError::OutOfBoundsTime),
+            ("+2001-12-31T00:61:00Z", EntityError::OutOfBoundsTime),
+            ("+2001-12-31T12", EntityError::MissingMinute),
+            ("+2001-12-31T12:34", EntityError::MissingSecond),
+            ("+2001-12-31T", EntityError::FloatParse),
+            ("+2001-12-31Tab:cd:ef", EntityError::FloatParse),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(parse_wb_time(raw), Err(expected), "parsing {raw:?}");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // parse_wb_number
+    // -----------------------------------------------------------------------
+
+    #[test]
     fn number_parsing() {
-        assert_eq!(parse_wb_number(&serde_json::json!("+5")), Ok(5.));
-        assert_eq!(parse_wb_number(&serde_json::json!("5")), Ok(5.));
-        assert_eq!(parse_wb_number(&serde_json::json!("-5")), Ok(-5.));
+        assert_eq!(parse_wb_number(&json!("+5")), Ok(5.));
+        assert_eq!(parse_wb_number(&json!("5")), Ok(5.));
+        assert_eq!(parse_wb_number(&json!("-5")), Ok(-5.));
+        assert_eq!(parse_wb_number(&json!("-81.12683")), Ok(-81.12683));
+        assert_eq!(parse_wb_number(&json!("+0")), Ok(0.));
+        assert_eq!(parse_wb_number(&json!("+1e3")), Ok(1000.));
+        // only one leading "+" is stripped; Rust's own float parser accepts the second
+        assert_eq!(parse_wb_number(&json!("++5")), Ok(5.));
+        // JSON numbers are accepted as well as Wikibase's signed strings
+        assert_eq!(parse_wb_number(&json!(5)), Ok(5.));
+        assert_eq!(parse_wb_number(&json!(-2.5)), Ok(-2.5));
+        assert_eq!(parse_wb_number(&json!(0)), Ok(0.));
+    }
+
+    #[test]
+    fn number_parsing_errors() {
+        for bad in [
+            json!(""),
+            json!("+"),
+            json!("abc"),
+            json!("5 "),
+            json!("- 5"),
+        ] {
+            assert_eq!(
+                parse_wb_number(&bad),
+                Err(EntityError::FloatParse),
+                "parsing {bad}"
+            );
+        }
+        for bad in [json!(true), json!(null), json!({}), json!([])] {
+            assert_eq!(
+                parse_wb_number(&bad),
+                Err(EntityError::ExpectedNumberString),
+                "parsing {bad}"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // try_get_as_qid
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn as_qid_test() {
         assert_eq!(
-            parse_wb_number(&serde_json::json!("-81.12683")),
-            Ok(-81.12683)
+            try_get_as_qid(&json!("http://www.wikidata.org/entity/Q1234567")),
+            Ok(Qid(1_234_567))
         );
-        assert_eq!(parse_wb_number(&serde_json::json!("+0")), Ok(0.));
+        assert_eq!(
+            try_get_as_qid(&json!("http://www.wikidata.org/entity/Q0")),
+            Ok(Qid(0))
+        );
+    }
+
+    #[test]
+    fn as_qid_rejects_other_iris() {
+        // the URI is matched literally, so the https form is not recognized
+        for bad in [
+            json!("https://www.wikidata.org/entity/Q5"),
+            json!("http://www.wikidata.org/entity/P31"),
+            json!("http://example.com/moon"),
+            json!("1"),
+            json!(""),
+        ] {
+            assert_eq!(
+                try_get_as_qid(&bad),
+                Err(EntityError::ExpectedQidString),
+                "parsing {bad}"
+            );
+        }
+        // a URI that is not a string at all
+        for bad in [json!(5), json!(null), json!({})] {
+            assert_eq!(
+                try_get_as_qid(&bad),
+                Err(EntityError::ExpectedUriString),
+                "parsing {bad}"
+            );
+        }
+        // the right prefix but a number that will not parse
+        assert_eq!(
+            try_get_as_qid(&json!("http://www.wikidata.org/entity/Qabc")),
+            Err(EntityError::FloatParse)
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // take_prop and get_json_string
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn take_prop_removes_the_property() {
+        let mut value = json!({ "a": 1, "b": 2 });
+        assert_eq!(take_prop("a", &mut value), json!(1));
+        assert_eq!(value, json!({ "b": 2 }));
+        // taking the same property twice yields null the second time
+        assert_eq!(take_prop("a", &mut value), Value::Null);
+    }
+
+    #[test]
+    fn take_prop_is_null_for_non_objects() {
+        assert_eq!(take_prop("a", &mut json!([1, 2])), Value::Null);
+        assert_eq!(take_prop("a", &mut json!("text")), Value::Null);
+        assert_eq!(take_prop("a", &mut Value::Null), Value::Null);
+    }
+
+    #[test]
+    fn json_strings() {
+        assert_eq!(get_json_string(&json!("hi")), Ok("hi".to_string()));
+        assert_eq!(get_json_string(&json!("")), Ok(String::new()));
+        for bad in [json!(5), json!(null), json!(true), json!([]), json!({})] {
+            assert_eq!(
+                get_json_string(&bad),
+                Err(EntityError::ExpectedString),
+                "parsing {bad}"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Rank
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rank_parsing() {
+        assert_eq!(Rank::from_str("normal"), Ok(Rank::Normal));
+        assert_eq!(Rank::from_str("preferred"), Ok(Rank::Preferred));
+        assert_eq!(Rank::from_str("deprecated"), Ok(Rank::Deprecated));
+        // the names are exact: no casing or whitespace leniency
+        for bad in ["Normal", " normal", "normal ", "", "unknown"] {
+            assert_eq!(
+                Rank::from_str(bad),
+                Err(EntityError::UnknownRank),
+                "{bad:?}"
+            );
+        }
     }
 }

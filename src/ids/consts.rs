@@ -40,6 +40,16 @@ macro_rules! qid_unit_suffixes {
 
 impl Qid {
     /// If the Qid is a commonly used unit on Wikidata, get it as a unit suffix.
+    ///
+    /// ## Example
+    /// ```
+    /// use wikidata::{Qid, consts};
+    /// assert_eq!(consts::METRE.unit_suffix(), Some(" m"));
+    /// assert_eq!(format!("1.96{}", consts::METRE.unit_suffix().unwrap_or_default()), "1.96 m");
+    /// // entities that are not units in the table have no suffix
+    /// assert_eq!(consts::HUMAN.unit_suffix(), None);
+    /// assert_eq!(Qid(0).unit_suffix(), None);
+    /// ```
     #[must_use]
     pub const fn unit_suffix(self) -> Option<&'static str> {
         consts::unit_suffix(self)
